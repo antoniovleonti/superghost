@@ -1,0 +1,33 @@
+<html>
+
+<head>
+<title></title>
+</head>
+
+<body>
+  <form method="POST"
+        action="/"
+        onsubmit="return submitAndResetForm(this);"
+        id="form">
+    <input type="text" name="prefix" maxlength="1" size="1">
+    <span id="word"></span>
+    <input type="text" name="suffix" maxlength="1" size="1">
+    <input type="submit" value="Submit">
+  </form>
+</body>
+
+<script>
+function submitAndResetForm (form) {
+  var xhr = new XMLHttpRequest()
+  xhr.onload = function () {
+    document.getElementById("word").innerHTML = xhr.responseText
+  }
+  xhr.open("POST", form.getAttribute("action"))
+  xhr.send(new URLSearchParams(new FormData(form)))
+  form.reset()
+
+  return false
+}
+</script>
+
+</html>
