@@ -6,7 +6,7 @@
 
 <body>
   <form method="POST"
-        action="/"
+        action="/word"
         onsubmit="return submitAndResetForm(this);"
         id="form">
     <input type="text" name="prefix" maxlength="1" size="1">
@@ -23,7 +23,7 @@ function longPollWord () {
     document.getElementById("word").innerHTML = xhr.responseText
     longPollWord()
   }
-  xhr.open("GET", "/long-poll")
+  xhr.open("GET", "/next-word")
   xhr.send()
 }
 

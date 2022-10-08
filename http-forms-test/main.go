@@ -21,6 +21,19 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
     case http.MethodGet:
       t, _ := template.ParseFiles("form.tmpl")
       t.Execute(w, nil)
+    default:
+      http.Error(w, "", http.StatusMethodNotAllowed)
+  }
+}
+
+func wordHandler(w http.ResponseWriter, r *http.Request) {
+  switch r.Method {
+    case http.MethodGet:
+      wordMutex.RLock()
+
+      fmt.Fprint(w, word)
+
+      wordMutex.RUnlock()
     case http.MethodPost:
       r.ParseForm()
 
@@ -38,19 +51,6 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 
       wordMutex.Unlock() // -End critical section-------------------------------
       longPollChannelsMutex.Unlock()
-    default:
-      http.Error(w, "", http.StatusMethodNotAllowed)
-  }
-}
-
-func wordHandler(w http.ResponseWriter, r *http.Request) {
-  switch r.Method {
-    case http.MethodGet:
-      wordMutex.RLock()
-
-      fmt.Fprint(w, word)
-
-      wordMutex.RUnlock()
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
   }
@@ -77,7 +77,7 @@ func main() {
 
   http.HandleFunc("/", rootHandler) // setting router rule
   http.HandleFunc("/word", wordHandler)
-  http.HandleFunc("/long-poll", nextWordHandler)
+  http.HandleFunc("/next-word", nextWordHandler)
 
   err := http.ListenAndServe(":9090", nil) // setting listening port
   if err != nil {
