@@ -10,6 +10,7 @@ import (
 )
 
 var word string
+var longPollChannels []chan string
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
@@ -25,17 +26,15 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-// func longPollHandler(w http.ResponseWriter, r *http.Request) {
-//   if r.Method == "GET" {
-//     t, _ := template.ParseFiles("form.tmpl")
-//     t.Execute(w, nil)
-//   } else {
-//   }
-// }
+func longPollHandler(w http.ResponseWriter, r *http.Request) {
+  myChan := make(chan string)
+  longPollChannels = append(longPollChannels, myChan)
+  fmt.Fprint(w, <-myChan)
+}
 
 func main() {
   http.HandleFunc("/", rootHandler) // setting router rule
-  // http.HandleFunc("/long-poll", longPollHandler) // setting router rule
+  http.HandleFunc("/long-poll", longPollHandler) // setting router rule
 
   err := http.ListenAndServe(":9090", nil) // setting listening port
   if err != nil {
