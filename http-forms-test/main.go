@@ -12,16 +12,16 @@ import (
 var word string
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
-  fmt.Println("method:", r.Method) //get request method
-  if r.Method == "GET" {
-    t, _ := template.ParseFiles("form.tmpl")
-    t.Execute(w, nil)
-  } else {
-    r.ParseForm()
-    // logic part of log in
-    word = r.FormValue("prefix") + word + r.FormValue("suffix")
-    fmt.Printf("new word: '%s'\n", word)
-    fmt.Fprint(w, word)
+  switch r.Method {
+    case http.MethodGet:
+      t, _ := template.ParseFiles("form.tmpl")
+      t.Execute(w, nil)
+    case http.MethodPost:
+      r.ParseForm()
+      // logic part of log in
+      word = r.FormValue("prefix") + word + r.FormValue("suffix")
+      fmt.Printf("new word: '%s'\n", word)
+      fmt.Fprint(w, word)
   }
 }
 
