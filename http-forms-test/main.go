@@ -3,7 +3,6 @@ package main
 import (
   "fmt"
   "html/template"
-  "github.com/gorilla/mux"
   "log"
   "net/http"
   // "net/http/httputil"
@@ -11,7 +10,6 @@ import (
 )
 
 var word string
-messages := make(chan string)
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
   fmt.Println("method:", r.Method) //get request method
@@ -27,17 +25,17 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-func longPollHandler(w http.ResponseWriter, r *http.Request) {
-  if r.Method == "GET" {
-    t, _ := template.ParseFiles("form.tmpl")
-    t.Execute(w, nil)
-  } else {
-  }
-}
+// func longPollHandler(w http.ResponseWriter, r *http.Request) {
+//   if r.Method == "GET" {
+//     t, _ := template.ParseFiles("form.tmpl")
+//     t.Execute(w, nil)
+//   } else {
+//   }
+// }
 
 func main() {
   http.HandleFunc("/", rootHandler) // setting router rule
-  http.HandleFunc("/long-poll", longPollHandler) // setting router rule
+  // http.HandleFunc("/long-poll", longPollHandler) // setting router rule
 
   err := http.ListenAndServe(":9090", nil) // setting listening port
   if err != nil {
