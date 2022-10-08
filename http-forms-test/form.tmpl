@@ -1,7 +1,7 @@
 <html>
 
 <head>
-<title></title>
+<title>Superghost test</title>
 </head>
 
 <body>
@@ -17,6 +17,26 @@
 </body>
 
 <script>
+function longPollWord () {
+  var xhr = new XMLHttpRequest()
+  xhr.onload = function () {
+    document.getElementById("word").innerHTML = xhr.responseText
+    longPollWord()
+  }
+  xhr.open("GET", "/long-poll")
+  xhr.send()
+}
+
+function getWord () {
+  var xhr = new XMLHttpRequest()
+  xhr.onload = function () {
+    document.getElementById("word").innerHTML = xhr.responseText
+    longPollWord()
+  }
+  xhr.open("GET", "/word")
+  xhr.send()
+}
+
 function submitAndResetForm (form) {
   var xhr = new XMLHttpRequest()
   xhr.onload = function () {
@@ -28,6 +48,9 @@ function submitAndResetForm (form) {
 
   return false
 }
+
+getWord()
+longPollWord()
 </script>
 
 </html>
