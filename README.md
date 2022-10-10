@@ -8,3 +8,4 @@ todo (demos / learn how):
   the server means not deleting your cookie)
 * delete games when no players are in them
 * timer for players adding letters to word
+* DBs?? (necessary? unnecessary?)
