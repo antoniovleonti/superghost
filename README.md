@@ -1,7 +1,7 @@
 # superghost-workspace
 
 todo:
-* verify words by sending http requests to `api.dictionaryapi.dev`
+* verify words by sending http requests to `api.dictionaryapi.dev` (DONE!)
 * modal in client asking for continuation (for use when someone challenges your
   continuation)
 * regular client pinging to stay connected to the server (staying connected to

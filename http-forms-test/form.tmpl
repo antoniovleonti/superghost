@@ -7,12 +7,20 @@
 <body>
   <form method="POST"
         action="/word"
-        onsubmit="return submitAndResetForm(this);"
-        id="form">
+        onsubmit="return affixLetterAndResetForm(this);"
+        id="affixLetterForm">
     <input type="text" name="prefix" maxlength="1" size="1">
     <span id="word"></span>
     <input type="text" name="suffix" maxlength="1" size="1">
-    <input type="submit" value="Submit">
+    <input type="submit" value="submit">
+  </form>
+  <form method="GET"
+        action="/is-word"
+        onsubmit="return validateWord(this);"
+        id="validateWordForm">
+    <input type="submit" value="validate word">
+    ➡️
+    <span id="validationResult">nil</span>
   </form>
 </body>
 
@@ -37,12 +45,24 @@ function getWord () {
   xhr.send()
 }
 
-function submitAndResetForm (form) {
+function affixLetterAndResetForm (form) {
   var xhr = new XMLHttpRequest()
   xhr.onload = function () {
     document.getElementById("word").innerHTML = xhr.responseText
   }
-  xhr.open("POST", form.getAttribute("action"))
+  xhr.open("POST", "/word")
+  xhr.send(new URLSearchParams(new FormData(form)))
+  form.reset()
+
+  return false
+}
+
+function validateWord(form) {
+  var xhr = new XMLHttpRequest()
+  xhr.onload = function () {
+    document.getElementById("validationResult").innerHTML = xhr.responseText
+  }
+  xhr.open("GET", "/is-word")
   xhr.send(new URLSearchParams(new FormData(form)))
   form.reset()
 
