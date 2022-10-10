@@ -1,6 +1,6 @@
 # superghost-workspace
 
-todo:
+todo (demos / learn how):
 * verify words by sending http requests to `api.dictionaryapi.dev` (DONE!)
 * modal in client asking for continuation (for use when someone challenges your
   continuation)
