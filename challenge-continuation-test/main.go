@@ -12,8 +12,13 @@ import (
   // "strings"
 )
 
+type Player struct {
+  Id string `json:"id"`
+  Cookie http.Cookie `json:"-"`
+}
+
 var word string
-var activeChallenge bool
+var inRebutMode bool
 var challengeListeners []chan bool
 var rebuttalListeners []chan string
 
@@ -22,6 +27,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
     case http.MethodGet:
       t, _ := template.ParseFiles("form.tmpl")
       t.Execute(w, nil)
+
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
   }
@@ -31,11 +37,18 @@ func wordHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
     case http.MethodGet:
       fmt.Fprint(w, word)
+
     case http.MethodPut:
+      if inRebutMode {
+        http.Error(w, "cannot change word until challenge is addressed",
+                   http.StatusBadRequest)
+        return
+      }
       r.ParseForm()
       word = r.FormValue("newWord")
       fmt.Printf("new word: '%s'\n", word)
       fmt.Fprint(w, word)
+
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
   }
@@ -47,13 +60,20 @@ func challengesHandler(w http.ResponseWriter, r *http.Request) {
       ch := make(chan bool, 1)
       challengeListeners = append(challengeListeners, ch)
       fmt.Fprint(w, <-ch)
+
     case http.MethodPost:
+      if inRebutMode {
+        http.Error(w, "another challenge has already been issued.",
+                   http.StatusBadRequest)
+        return
+      }
+      inRebutMode = true
       for _, ch := range challengeListeners {
         ch <- true
       }
       challengeListeners = make([]chan bool, 0)
-      activeChallenge = true
       fmt.Fprint(w, "challenge issued")
+
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
   }
@@ -65,8 +85,9 @@ func rebuttalsHandler(w http.ResponseWriter, r *http.Request) {
       ch := make(chan string, 1)
       rebuttalListeners = append(rebuttalListeners, ch)
       fmt.Fprint(w, <-ch)
+
     case http.MethodPost:
-      if !activeChallenge {
+      if !inRebutMode {
         http.Error(w, "cannot rebut unless a challenge has been issued",
                    http.StatusBadRequest)
       }
@@ -104,7 +125,7 @@ func rebuttalsHandler(w http.ResponseWriter, r *http.Request) {
       }
       rebuttalListeners = make([]chan string, 0)
 
-      activeChallenge = false
+      inRebutMode = false
 
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
@@ -114,7 +135,7 @@ func rebuttalsHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
   challengeListeners = make([]chan bool, 0)
   rebuttalListeners = make([]chan string, 0)
-  activeChallenge = false
+  inRebutMode = false
 
   http.HandleFunc("/", rootHandler) // setting router rule
   http.HandleFunc("/word", wordHandler)
