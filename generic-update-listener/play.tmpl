@@ -71,8 +71,8 @@ function renderPlayers(players, nextPlayer) {
   playerList.innerHTML = "" // clear
   for (let i = 0; i < players.length; i++) {
     var node = document.createElement("li")
-    var playerStr = "username: " + players[i].username +
-        "; score: " + players[i].score + ((i == nextPlayer) ? " ***" : "")
+    var playerStr = players[i].username + " "
+        + players[i].score + ((i == nextPlayer) ? " ✍️" : "")
     node.appendChild(document.createTextNode(playerStr))
     playerList.appendChild(node)
   }

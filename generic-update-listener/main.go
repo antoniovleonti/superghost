@@ -108,7 +108,6 @@ func stateHandler(w http.ResponseWriter, r *http.Request) {
       if err != nil {
         panic ("couldn't marshal game state")
       }
-      fmt.Println(string(b))
       fmt.Fprint(w, string(b))
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
@@ -137,7 +136,8 @@ func broadcastGameState() {
   if err != nil {
     panic("couldn't encode gamestate") // something's gone terribly wrong
   }
-  s := string(b)
+  s := string(b) // print all updates to game state to the console!
+  fmt.Println(s)
   for _, c := range _listeners {
     c <- s
   }

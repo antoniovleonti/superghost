@@ -23,7 +23,7 @@ type GameState struct {
   word string
   phase GamePhase
   nextPlayer uint
-  lastPlayer uint
+  lastPlayer string
   firstPlayer uint
 }
 type JGameState struct { // publicly visible version of gamestate
@@ -31,7 +31,7 @@ type JGameState struct { // publicly visible version of gamestate
   Word string       `json:"word"`
   Phase GamePhase   `json:"phase"`
   NextPlayer uint   `json:"nextPlayer"`
-  LastPlayer uint   `json:"lastPlayer"`
+  LastPlayer string `json:"lastPlayer"`
   FirstPlayer uint  `json:"firstPlayer"`
 }
 
@@ -44,7 +44,7 @@ func (gs *GameState) MarshalJSON() ([]byte, error) {
     Word: gs.word,
     Phase: gs.phase,
     NextPlayer: gs.nextPlayer % uint(len(gs.players)),
-    LastPlayer: gs.lastPlayer % uint(len(gs.players)),
+    LastPlayer: gs.lastPlayer,
     FirstPlayer: gs.firstPlayer % uint(len(gs.players)),
   })
 }
@@ -55,7 +55,7 @@ func NewGameState() *GameState {
   gs.usernameToPlayer = make(map[string]*Player)
   gs.phase = kInsufficientPlayers
   gs.nextPlayer = 0
-  gs.lastPlayer = 0 // not super meaningful...
+  gs.lastPlayer = ""
   gs.firstPlayer = 0
   return gs
 }
@@ -70,8 +70,8 @@ func (gs *GameState) AffixWord(prefix string, suffix string) (string, error) {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
   gs.word = prefix + gs.word + suffix
+  gs.lastPlayer = gs.players[gs.nextPlayer % uint(len(gs.players))].username
   gs.nextPlayer++
-  gs.lastPlayer++
   return gs.word, nil
 }
 
