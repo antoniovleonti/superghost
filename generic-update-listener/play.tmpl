@@ -10,15 +10,54 @@
 <h1>superghost</h1>
 </header>
 
+<h2>Actions</h2>
+
+<div id="updateDiv">
+Update word
 <form method="POST"
       action="/word"
       onsubmit="return affixLetterAndResetForm(this);"
       id="affixLetterForm">
-  <input type="text" name="prefix" maxlength="1" size="1">
-  <span id="word"></span>
-  <input type="text" name="suffix" maxlength="1" size="1">
-  <input type="submit" value="submit">
+  <fieldset id="editWordFields" disabled=true>
+    <input type="text" name="prefix" maxlength="1" size="1">
+    <span id="word"></span>
+    <input type="text" name="suffix" maxlength="1" size="1">
+    <input type="submit" value="submit">
+  </fieldset>
 </form>
+</div>
+
+<div id="challengeDiv">
+Challenge
+<form method="POST"
+      action="/challenge-is-word"
+      onsubmit="return challengeIsWord(this);"
+      id="challengeIsWordForm">
+  <input type="submit"
+      id="challengeLastLetterButton"
+      value="challange; this is a word">
+</form>
+
+<form method="POST"
+      action="/challenge-continuation"
+      onsubmit="return challengeContinuation(this);"
+      id="challengeContinuationForm">
+  <input type="submit" id="challengeContinuationButton" value="challange; no continuation">
+</form>
+</div>
+
+<div id="rebutDiv">
+Rebut challenge
+<form method="POST"
+      action="/rebuttal"
+      onsubmit="return rebut(this);"
+      id="rebutForm">
+  <fieldset id=rebutFieldSet disabled>
+    <input type="text" name="continuation">
+    <input type="submit" value="submit">
+  </fieldset>
+</form>
+</div>
 
 <h2>Players:</h2>
 <ol id="playerList">
@@ -28,11 +67,40 @@
 
 <script>
 
+const myUsername = "{{.Username}}"
+
 function affixLetterAndResetForm (form) {
   var xhr = new XMLHttpRequest()
   xhr.open("POST", "/word")
   xhr.send(new URLSearchParams(new FormData(form)))
   form.reset()
+
+  return false
+}
+
+function challengeIsWord(form) {
+  var xhr = new XMLHttpRequest()
+  xhr.open("POST", "/challenge-is-word")
+  xhr.send()
+
+  return false
+}
+
+function challengeContinuation(form) {
+  var xhr = new XMLHttpRequest()
+  xhr.open("POST", "/challenge-continuation")
+  xhr.send()
+
+  return false
+}
+
+function rebut(form) {
+  var xhr = new XMLHttpRequest()
+  xhr.onload =  function () {
+    console.log(xhr.responseText)
+  }
+  xhr.open("POST", "/rebuttal")
+  xhr.send(new URLSearchParams(new FormData(form)))
 
   return false
 }
@@ -63,6 +131,21 @@ function getCurrentGameState () {
 function renderEverything(gameState) {
   renderPlayers(gameState.players, gameState.nextPlayer)
   renderWord(gameState.word)
+  if (gameState.players[gameState.nextPlayer].username == myUsername) {
+    switch (gameState.phase) {
+      case "kEdit":
+        renderMyTurn()
+        break;
+      case "kRebut":
+        renderMyRebuttal()
+        break
+      case "kInsufficientPlayers":
+        renderNotMyTurn()
+        break
+    }
+  } else {
+    renderNotMyTurn()
+  }
 }
 
 function renderPlayers(players, nextPlayer) {
@@ -72,10 +155,42 @@ function renderPlayers(players, nextPlayer) {
   for (let i = 0; i < players.length; i++) {
     var node = document.createElement("li")
     var playerStr = players[i].username + " "
-        + players[i].score + ((i == nextPlayer) ? " ✍️" : "")
+        + players[i].score
+        + ((players[i].username == myUsername) ? " 🫵" : "")
+        + ((i == nextPlayer) ? " ✍️" : "")
     node.appendChild(document.createTextNode(playerStr))
     playerList.appendChild(node)
   }
+}
+
+function renderMyTurn() {
+  // enable editor
+  document.getElementById("editWordFields").disabled=false
+  // enable challenge buttons
+  document.getElementById("challengeContinuationButton").disabled=false
+  document.getElementById("challengeLastLetterButton").disabled=false
+  // disable rebut inputs
+  document.getElementById("rebutFieldSet").disabled=true
+}
+
+function renderNotMyTurn() {
+  // enable editor
+  document.getElementById("editWordFields").disabled=true
+  // enable challenge buttons
+  document.getElementById("challengeContinuationButton").disabled=true
+  document.getElementById("challengeLastLetterButton").disabled=true
+  // disable rebut inputs
+  document.getElementById("rebutFieldSet").disabled=true
+}
+
+function renderMyRebuttal() {
+  // enable editor
+  document.getElementById("editWordFields").disabled=true
+  // enable challenge buttons
+  document.getElementById("challengeContinuationButton").disabled=true
+  document.getElementById("challengeLastLetterButton").disabled=true
+  // disable rebut inputs
+  document.getElementById("rebutFieldSet").disabled=false
 }
 
 function renderWord(word) {

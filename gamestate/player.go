@@ -53,3 +53,8 @@ func NewCookie(username string) *http.Cookie {
 func (p *Player) GetCookie() *http.Cookie {
   return p.cookie
 }
+
+func init() {
+  rand.Seed(time.Now().UnixNano())
+}
+
