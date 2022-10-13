@@ -5,6 +5,7 @@ import (
   "sync"
   "strings"
   "errors"
+  "encoding/json"
   // "fmt"
 )
 
@@ -25,8 +26,8 @@ type GameState struct {
   lastPlayer uint
   firstPlayer uint
 }
-type JGameState struct { // For json encoding
-  Players []Player  `json:"players"`
+type JGameState struct { // publicly visible version of gamestate
+  Players []*Player  `json:"players"`
   Word string       `json:"word"`
   Phase GamePhase   `json:"phase"`
   NextPlayer uint   `json:"nextPlayer"`
@@ -34,9 +35,23 @@ type JGameState struct { // For json encoding
   FirstPlayer uint  `json:"firstPlayer"`
 }
 
+func (gs *GameState) MarshalJSON() ([]byte, error) {
+  gs.mutex.RLock()
+  defer gs.mutex.RUnlock()
+
+  return json.Marshal(JGameState {
+    Players: gs.players,
+    Word: gs.word,
+    Phase: gs.phase,
+    NextPlayer: gs.nextPlayer % uint(len(gs.players)),
+    LastPlayer: gs.lastPlayer % uint(len(gs.players)),
+    FirstPlayer: gs.firstPlayer % uint(len(gs.players)),
+  })
+}
+
 func NewGameState() *GameState {
   gs := new(GameState)
-  gs.players = make([]*Player, 2)
+  gs.players = make([]*Player, 0)
   gs.usernameToPlayer = make(map[string]*Player)
   gs.phase = kInsufficientPlayers
   gs.nextPlayer = 0
@@ -55,6 +70,8 @@ func (gs *GameState) AffixWord(prefix string, suffix string) (string, error) {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
   gs.word = prefix + gs.word + suffix
+  gs.nextPlayer++
+  gs.lastPlayer++
   return gs.word, nil
 }
 
@@ -86,6 +103,23 @@ func (gs *GameState) IsValidCookie(cookie *http.Cookie) bool {
     return false
   }
   return gs.usernameToPlayer[cookie.Name].cookie.Value == cookie.Value
+}
+
+func (gs *GameState) HasInTurnCookie(cookies []*http.Cookie) bool {
+  for _, cookie := range cookies {
+    if gs.IsInTurnCookie(cookie) {
+      return true
+    }
+  }
+  return false
+}
+
+func (gs *GameState) IsInTurnCookie(cookie *http.Cookie) bool {
+  gs.mutex.RLock()
+  defer gs.mutex.RUnlock()
+
+  p := gs.players[gs.nextPlayer % uint(len(gs.players))]
+  return (p.username == cookie.Name) && (p.cookie.Value == cookie.Value)
 }
 
 func (gs *GameState) AddPlayer(username string) (*http.Cookie, error) {

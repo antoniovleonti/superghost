@@ -5,12 +5,25 @@ import(
   "math/rand"
   "encoding/base64"
   "time"
+  "encoding/json"
 )
 
 type Player struct {
   username string
   score uint
   cookie *http.Cookie
+}
+
+type JPlayer struct {
+  Username string `json:"username"`
+  Score uint        `json:"score"`
+}
+
+func (p *Player) MarshalJSON() ([]byte, error) {
+  return json.Marshal(JPlayer {
+    Username: p.username,
+    Score: p.score,
+  })
 }
 
 func NewPlayer(username string) *Player {

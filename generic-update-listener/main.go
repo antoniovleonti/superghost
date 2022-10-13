@@ -1,31 +1,33 @@
 package main
 
 import (
+  "encoding/json"
   "fmt"
   "html/template"
   "log"
   "net/http"
-  "sync"
-  // "io"
-  // "encoding/json"
   "superghost/gamestate"
+  "sync"
+  "regexp"
+  // "encoding/json"
+  // "io"
   // "net/http/httputil"
   // "strings"
 )
 
-var updateListeners []chan string
-var updateListenersMutex sync.RWMutex
+var _listeners []chan string
+var _listenersMutex sync.RWMutex
 
-var gs *gamestate.GameState
+var _gs *gamestate.GameState
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
     case http.MethodGet:
-      if !gs.ContainsValidCookie(r.Cookies()) {
+      if !_gs.ContainsValidCookie(r.Cookies()) {
         http.Redirect(w, r, "/join", http.StatusFound)
         return
       }
-      t, _ := template.ParseFiles("form.tmpl")
+      t, _ := template.ParseFiles("play.tmpl")
       t.Execute(w, nil)
       return
 
@@ -42,18 +44,29 @@ func joinHandler(w http.ResponseWriter, r *http.Request) {
 
     case http.MethodPost:
       r.ParseForm()
-
       if len(r.FormValue("username")) == 0 {
         http.Error(w, "no username provided", http.StatusBadRequest)
         return
       }
-      cookie, err := gs.AddPlayer(r.FormValue("username"))
+      match, err := regexp.MatchString(`^[[:alnum:]]+$`,
+                                       r.FormValue("username"))
+      if err != nil {
+        http.Error(w, "couldn't understand username", http.StatusBadRequest)
+        return
+      }
+      if !match {
+        http.Error(w, "username must be alphanumeric", http.StatusBadRequest)
+        return
+      }
+      fmt.Println(r.FormValue("username"))
+      cookie, err := _gs.AddPlayer(r.FormValue("username"))
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
       }
       http.SetCookie(w, cookie)
       http.Redirect(w, r, "/", http.StatusSeeOther)
+      broadcastGameState()
       return
 
     default:
@@ -64,40 +77,51 @@ func joinHandler(w http.ResponseWriter, r *http.Request) {
 func wordHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
     case http.MethodGet:
-      fmt.Fprint(w, gs.GetWord())
+      fmt.Fprint(w, _gs.GetWord())
 
     case http.MethodPost:
+      if !_gs.HasInTurnCookie(r.Cookies()) {
+        http.Error(w, "request out of turn", http.StatusBadRequest)
+        return
+      }
       r.ParseForm()
 
-      updateListenersMutex.Lock()
-
-      word, err := gs.AffixWord(r.FormValue("prefix"), r.FormValue("suffix"))
+      word, err := _gs.AffixWord(r.FormValue("prefix"), r.FormValue("suffix"))
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
+        return
       }
-      fmt.Printf("new word: '%s'\n", word)
-      fmt.Fprint(w, word)
-      // broadcast new word to all long poll listeners
-      for _, c := range updateListeners {
-        c <- word
-      }
-      updateListeners = make([]chan string, 0) // clear
 
-      updateListenersMutex.Unlock()
+      fmt.Printf("new word: '%s'\n", word)
+      fmt.Fprint(w, "success")
+      broadcastGameState()
+
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
   }
 }
 
-func nextWordHandler(w http.ResponseWriter, r *http.Request) {
+func stateHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
     case http.MethodGet:
-      updateListenersMutex.Lock()
+      b, err := json.Marshal(_gs)
+      if err != nil {
+        panic ("couldn't marshal game state")
+      }
+      fmt.Println(string(b))
+      fmt.Fprint(w, string(b))
+    default:
+      http.Error(w, "", http.StatusMethodNotAllowed)
+  }
+}
 
+func nextStateHandler(w http.ResponseWriter, r *http.Request) {
+  switch r.Method {
+    case http.MethodGet:
+      _listenersMutex.Lock()
       myChan := make(chan string)
-      updateListeners = append(updateListeners, myChan)
-
-      updateListenersMutex.Unlock()
+      _listeners = append(_listeners, myChan)
+      _listenersMutex.Unlock()
 
       fmt.Fprint(w, <-myChan)
     default:
@@ -105,32 +129,30 @@ func nextWordHandler(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-func isWordHandler(w http.ResponseWriter, r *http.Request) {
-  switch r.Method {
-    case http.MethodGet:
-      isValid, err := gs.ValidateWord()
-      if err != nil {
-        // handle error
-        http.Error(w, "Error validating word", http.StatusInternalServerError)
-        return
-      }
-      fmt.Fprint(w, isValid)
-      return
+func broadcastGameState() {
+  _listenersMutex.Lock()
+  defer _listenersMutex.Unlock()
 
-    default:
-      http.Error(w, "", http.StatusMethodNotAllowed)
+  b, err := json.Marshal(_gs)
+  if err != nil {
+    panic("couldn't encode gamestate") // something's gone terribly wrong
   }
+  s := string(b)
+  for _, c := range _listeners {
+    c <- s
+  }
+  _listeners = make([]chan string, 0) // clear
 }
 
 func main() {
-  gs = gamestate.NewGameState()
-  updateListeners = make([]chan string, 0)
+  _gs = gamestate.NewGameState()
+  _listeners = make([]chan string, 0)
 
   http.HandleFunc("/", rootHandler) // setting router rule
   http.HandleFunc("/join", joinHandler) // setting router rule
+  http.HandleFunc("/next-state", nextStateHandler)
+  http.HandleFunc("/state", stateHandler)
   http.HandleFunc("/word", wordHandler)
-  http.HandleFunc("/next-word", nextWordHandler)
-  http.HandleFunc("/is-word", isWordHandler)
 
   err := http.ListenAndServe(":9090", nil) // setting listening port
   if err != nil {

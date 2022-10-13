@@ -1,0 +1,90 @@
+<html>
+
+<head>
+<title>Superghost test</title>
+</head>
+
+<body>
+
+<header>
+<h1>superghost</h1>
+</header>
+
+<form method="POST"
+      action="/word"
+      onsubmit="return affixLetterAndResetForm(this);"
+      id="affixLetterForm">
+  <input type="text" name="prefix" maxlength="1" size="1">
+  <span id="word"></span>
+  <input type="text" name="suffix" maxlength="1" size="1">
+  <input type="submit" value="submit">
+</form>
+
+<h2>Players:</h2>
+<ol id="playerList">
+</ol>
+
+</body>
+
+<script>
+
+function affixLetterAndResetForm (form) {
+  var xhr = new XMLHttpRequest()
+  xhr.open("POST", "/word")
+  xhr.send(new URLSearchParams(new FormData(form)))
+  form.reset()
+
+  return false
+}
+
+function longPollNextGameState () {
+  var xhr = new XMLHttpRequest()
+  xhr.onload = function () {
+    var state = JSON.parse(xhr.responseText)
+    console.log(xhr.responseText)
+    renderEverything(state)
+    longPollNextGameState()
+  }
+  xhr.open("GET", "/next-state")
+  xhr.send()
+}
+
+function getCurrentGameState () {
+  var xhr = new XMLHttpRequest()
+  xhr.onload = function () {
+    var state = JSON.parse(xhr.responseText)
+    console.log(xhr.responseText)
+    renderEverything(state)
+  }
+  xhr.open("GET", "/state")
+  xhr.send()
+}
+
+function renderEverything(gameState) {
+  renderPlayers(gameState.players, gameState.nextPlayer)
+  renderWord(gameState.word)
+}
+
+function renderPlayers(players, nextPlayer) {
+  playerList = document.getElementById("playerList")
+  console.log(nextPlayer)
+  playerList.innerHTML = "" // clear
+  for (let i = 0; i < players.length; i++) {
+    var node = document.createElement("li")
+    var playerStr = "username: " + players[i].username +
+        "; score: " + players[i].score + ((i == nextPlayer) ? " ***" : "")
+    node.appendChild(document.createTextNode(playerStr))
+    playerList.appendChild(node)
+  }
+}
+
+function renderWord(word) {
+  document.getElementById("word").innerHTML = word
+}
+
+getCurrentGameState()
+longPollNextGameState()
+
+</script>
+
+</html>
