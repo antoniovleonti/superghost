@@ -1,4 +1,4 @@
-package gamestate
+package superghost
 
 import (
   "encoding/json"
@@ -8,15 +8,16 @@ import (
   "strings"
   "sync"
   "time"
+  // "regexp"
 )
 
-type GamePhase int
+type GameMode int
 const (
-  kEdit GamePhase = iota
+  kEdit GameMode = iota
   kRebut
   kInsufficientPlayers
 )
-func (p GamePhase) String() string {
+func (p GameMode) String() string {
   switch p {
     case kEdit:
       return "edit"
@@ -25,7 +26,7 @@ func (p GamePhase) String() string {
     case kInsufficientPlayers:
       return "insufficient players"
     default:
-      panic("unsupported value!")
+      panic("invalid GameMode value")
   }
 }
 
@@ -34,7 +35,7 @@ type GameState struct {
   players []*Player
   usernameToPlayer map[string]*Player
   word string
-  phase GamePhase
+  mode GameMode
   nextPlayer int
   lastPlayer string
   firstPlayer int
@@ -43,7 +44,7 @@ type GameState struct {
 type JGameState struct { // publicly visible version of gamestate
   Players []*Player  `json:"players"`
   Word string       `json:"word"`
-  Phase string   `json:"phase"`
+  Mode string   `json:"phase"`
   NextPlayer int   `json:"nextPlayer"`
   LastPlayer string `json:"lastPlayer"`
   FirstPlayer int  `json:"firstPlayer"`
@@ -56,7 +57,7 @@ func (gs *GameState) MarshalJSON() ([]byte, error) {
   return json.Marshal(JGameState {
     Players: gs.players,
     Word: gs.word,
-    Phase: gs.phase.String(),
+    Mode: gs.mode.String(),
     NextPlayer: gs.nextPlayer,
     LastPlayer: gs.lastPlayer,
     FirstPlayer: gs.firstPlayer,
@@ -67,20 +68,37 @@ func NewGameState() *GameState {
   gs := new(GameState)
   gs.players = make([]*Player, 0)
   gs.usernameToPlayer = make(map[string]*Player)
-  gs.phase = kInsufficientPlayers
+  gs.mode = kInsufficientPlayers
   gs.nextPlayer = 0
   gs.lastPlayer = ""
   gs.firstPlayer = 0
   return gs
 }
 
-func (gs *GameState) AffixWord(prefix string, suffix string) (string, error) {
+func (gs *GameState) AffixWord(
+    cookies []*http.Cookie, prefix string, suffix string) error {
+  gs.mutex.RLock()
+  if gs.mode != kEdit {
+    gs.mutex.RUnlock()
+    return fmt.Errorf("cannot edit word in %s mode", gs.mode.String())
+  }
+  gs.mutex.RUnlock()
+  if _, ok := gs.getInTurnCookie(cookies); !ok {
+    return fmt.Errorf("it is not your turn")
+  }
+  if len(prefix) > 0 && len(suffix) > 0 {
+    return fmt.Errorf("only one of prefix or suffix should be specified")
+  }
+  if len(prefix) != 1 && len(suffix) != 1 {
+    return fmt.Errorf("affix must be of length 1")
+  }
+  if !_lowerPattern.MatchString(prefix) && !_lowerPattern.MatchString(suffix) {
+    return fmt.Errorf("affix must be lowercase alphabetic (no unicode)")
+  }
+
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
-  if gs.phase != kEdit {
-    return "", errors.New(fmt.Sprintf("cannot edit word in %s mode",
-                                       gs.phase.String()))
-  }
+
   gs.word = prefix + gs.word + suffix
   gs.lastPlayer = gs.players[gs.nextPlayer].username
   if len(gs.players) == 0 {
@@ -88,16 +106,7 @@ func (gs *GameState) AffixWord(prefix string, suffix string) (string, error) {
   } else {
     gs.nextPlayer = (gs.nextPlayer + 1) % len(gs.players)
   }
-  return gs.word, nil
-}
-
-func validateWord(word string) (bool, error) {
-  reqUri := "https://api.dictionaryapi.dev/api/v2/entries/en/" + word
-  resp, err := http.Get(reqUri)
-  if err != nil {
-    return false, err
-  }
-  return resp.StatusCode == http.StatusOK, nil
+  return nil
 }
 
 func (gs *GameState) GetValidCookie(cookies []*http.Cookie) (string, bool) {
@@ -119,7 +128,7 @@ func (gs *GameState) isValidCookie(cookie *http.Cookie) bool {
   return gs.usernameToPlayer[cookie.Name].cookie.Value == cookie.Value
 }
 
-func (gs *GameState) GetInTurnCookie(cookies []*http.Cookie) (
+func (gs *GameState) getInTurnCookie(cookies []*http.Cookie) (
     *http.Cookie, bool) {
   for _, cookie := range cookies {
     if gs.isInTurnCookie(cookie) {
@@ -140,21 +149,23 @@ func (gs *GameState) isInTurnCookie(cookie *http.Cookie) bool {
 func (gs *GameState) AddPlayer(username string) (*http.Cookie, error) {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
-
   // sanitize & validate username
-  username = strings.TrimSpace(username)
-  if _, ok := gs.usernameToPlayer[username]; ok {
-    return nil, errors.New("username already in use")
+  match := _alphanumPattern.MatchString(username)
+  if !match {
+    return nil, errors.New("username must be alphanumeric")
   }
-  p := NewPlayer(username)
+  if _, ok := gs.usernameToPlayer[username]; ok {
+    return nil, fmt.Errorf("username '%s' already in use", username)
+  }
 
+  p := NewPlayer(username)
   gs.usernameToPlayer[username] = p
   gs.players = append(gs.players, p)
-  if len(gs.players) >= 2 && gs.phase == kInsufficientPlayers {
-    gs.phase = kEdit
+  if len(gs.players) >= 2 && gs.mode == kInsufficientPlayers {
+    gs.mode = kEdit
   }
   if len(gs.players) < 2 {
-    gs.phase = kInsufficientPlayers
+    gs.mode = kInsufficientPlayers
     gs.newRound()
   }
   return p.cookie, nil
@@ -169,16 +180,22 @@ func (gs *GameState) newRound() {
   }
   gs.lastPlayer = ""
   gs.nextPlayer = gs.firstPlayer
-  gs.phase = kEdit
+  if len(gs.players) >= 2 {
+    gs.mode = kEdit
+  } else {
+    gs.mode = kInsufficientPlayers
+  }
 }
 
-func (gs *GameState) ChallengeIsWord() error {
+func (gs *GameState) ChallengeIsWord(cookies []*http.Cookie) error {
+  if _, ok := gs.getInTurnCookie(cookies); !ok {
+    return fmt.Errorf("it is not your turn")
+  }
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
-  if gs.phase != kEdit {
-    return errors.New(fmt.Sprintf("cannot challenge in %s mode",
-                                  gs.phase.String()))
+  if gs.mode != kEdit {
+    return fmt.Errorf("cannot challenge in %s mode", gs.mode.String())
   }
 
   isWord, err := validateWord(gs.word)
@@ -196,13 +213,15 @@ func (gs *GameState) ChallengeIsWord() error {
   return nil
 }
 
-func (gs *GameState) ChallengeContinuation() error {
+func (gs *GameState) ChallengeContinuation(cookies []*http.Cookie) error {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
-  if gs.phase != kEdit {
-    return errors.New(fmt.Sprintf("cannot challenge in %s mode",
-                                  gs.phase.String()))
+  if _, ok := gs.getInTurnCookie(cookies); !ok {
+    return fmt.Errorf("it is not your turn")
+  }
+  if gs.mode != kEdit {
+    return fmt.Errorf("cannot challenge in %s mode", gs.mode.String())
   }
 
   tmpNextPlayer := gs.nextPlayer
@@ -219,17 +238,19 @@ func (gs *GameState) ChallengeContinuation() error {
   }
 
   gs.lastPlayer = gs.players[tmpNextPlayer % len(gs.players)].username
-  gs.phase = kRebut
+  gs.mode = kRebut
   return nil
 }
 
-func (gs *GameState) RebutChallenge(continuation string) error {
-  if gs.phase != kRebut {
-    return errors.New(fmt.Sprintf("cannot rebut in %s mode", gs.phase.String()))
+func (gs *GameState) RebutChallenge(
+    cookies []*http.Cookie, continuation string) error {
+  if gs.mode != kRebut {
+    return fmt.Errorf("cannot rebut in %s mode", gs.mode.String())
   }
-  // clean up word
+  if _, ok := gs.getInTurnCookie(cookies); !ok {
+    return fmt.Errorf("it is not your turn")
+  }
   continuation = strings.TrimSpace(continuation)
-  // verify continuation contains current word
   if !strings.Contains(continuation, gs.word) {
     return errors.New("continuation must contain current substring")
   }
@@ -260,14 +281,14 @@ func (gs *GameState) RemoveDeadPlayers(duration time.Duration) bool {
   for i := len(gs.players) - 1; i >= 0; i-- {
     if time.Since(gs.players[i].lastHeartbeat) > duration {
       fmt.Println(time.Since(gs.players[i].lastHeartbeat))
-      gs.removeDeadPlayer(i)
+      gs.removePlayer(i)
       didRemovePlayer = true
     }
   }
   return didRemovePlayer
 }
 
-func (gs *GameState) removeDeadPlayer(index int) {
+func (gs *GameState) removePlayer(index int) {
   if index < gs.nextPlayer {
     gs.nextPlayer--
   }
@@ -279,47 +300,25 @@ func (gs *GameState) removeDeadPlayer(index int) {
   delete(gs.usernameToPlayer, gs.players[index].username)
 
   if (index == len(gs.players) - 1) {
-    gs.players = gs.players[:index]
+    gs.players = gs.players[:index] // avoid out of bounds...
   } else {
     gs.players = append(gs.players[:index], gs.players[index+1:]...)
   }
 }
 
-func (gs *GameState) PlayerHeartbeat(username string) error {
+func (gs *GameState) Heartbeat(cookies []*http.Cookie) error {
+  username, ok := gs.GetValidCookie(cookies) // needs mutex
+  if !ok {
+    return fmt.Errorf("no credentials provided")
+  }
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
   p, ok := gs.usernameToPlayer[username]
   if !ok {
-    return errors.New("player does not exist")
+    return fmt.Errorf("player does not exist")
   }
   p.heartbeat()
   return nil
 }
 
-
-// Generated by https://mholt.github.io/json-to-go/
-// type Entry []struct {
-// 	Word      string `json:"word"`
-// 	Phonetic  string `json:"phonetic,omitempty"`
-// 	Phonetics []struct {
-// 		Text      string `json:"text"`
-// 		Audio     string `json:"audio"`
-// 		SourceURL string `json:"sourceUrl,omitempty"`
-// 	} `json:"phonetics"`
-// 	Meanings []struct {
-// 		PartOfSpeech string `json:"partOfSpeech"`
-// 		Definitions  []struct {
-// 			Definition string        `json:"definition"`
-// 			Synonyms   []string `json:"synonyms"`
-// 			Antonyms   []string `json:"antonyms"`
-// 		} `json:"definitions"`
-// 		Synonyms []string `json:"synonyms"`
-// 		Antonyms []string `json:"antonyms"`
-// 	} `json:"meanings"`
-// 	License struct {
-// 		Name string `json:"name"`
-// 		URL  string `json:"url"`
-// 	} `json:"license"`
-//	SourceUrls []string `json:"sourceUrls"`
-// }

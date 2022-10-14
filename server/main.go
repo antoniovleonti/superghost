@@ -7,18 +7,18 @@ import (
   "log"
   "net/http"
   "time"
-  "superghost/gamestate"
+  "superghost"
   "sync"
-  "regexp"
 )
 
 var _listeners []chan string
 var _listenersMutex sync.RWMutex
 
-var _gs *gamestate.GameState
+var _gs *superghost.GameState
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
+
     case http.MethodGet:
       username, ok := _gs.GetValidCookie(r.Cookies())
       if !ok {
@@ -35,28 +35,19 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func joinHandler(w http.ResponseWriter, r *http.Request) {
+  if _, ok := _gs.GetValidCookie(r.Cookies()); ok {
+    http.Redirect(w, r, "/", http.StatusFound)
+    return
+  }
   switch r.Method {
+
     case http.MethodGet:
+      // they've already joined -- redirect them back to the game
       t, _ := template.ParseFiles("join.tmpl")
       t.Execute(w, nil)
 
     case http.MethodPost:
       r.ParseForm()
-      if len(r.FormValue("username")) == 0 {
-        http.Error(w, "no username provided", http.StatusBadRequest)
-        return
-      }
-      match, err := regexp.MatchString(`^[[:alnum:]]+$`,
-                                       r.FormValue("username"))
-      if err != nil {
-        http.Error(w, "unexpected error while parsing username",
-                   http.StatusBadRequest)
-        return
-      }
-      if !match {
-        http.Error(w, "username must be alphanumeric", http.StatusBadRequest)
-        return
-      }
       cookie, err := _gs.AddPlayer(r.FormValue("username"))
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
@@ -76,18 +67,13 @@ func wordHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
 
     case http.MethodPost:
-      if _, ok := _gs.GetInTurnCookie(r.Cookies()); !ok {
-        http.Error(w, "request out of turn", http.StatusBadRequest)
-        return
-      }
       r.ParseForm()
-
-      _, err := _gs.AffixWord(r.FormValue("prefix"), r.FormValue("suffix"))
+      err := _gs.AffixWord(r.Cookies(), r.FormValue("prefix"),
+                           r.FormValue("suffix"))
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
       }
-
       fmt.Fprint(w, "success")
       broadcastGameState()
 
@@ -98,14 +84,9 @@ func wordHandler(w http.ResponseWriter, r *http.Request) {
 
 func challengeIsWordHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
-    case http.MethodPost:
-      // it must be your turn to challenge.
-      if _, ok := _gs.GetInTurnCookie(r.Cookies()); !ok {
-        http.Error(w, "request out of turn", http.StatusBadRequest)
-        return
-      }
 
-      err := _gs.ChallengeIsWord()
+    case http.MethodPost:
+      err := _gs.ChallengeIsWord(r.Cookies())
       if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
       }
@@ -120,12 +101,8 @@ func challengeContinuationHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
     case http.MethodPost:
       // it must be your turn to challenge.
-      if _, ok := _gs.GetInTurnCookie(r.Cookies()); !ok {
-        http.Error(w, "request out of turn", http.StatusBadRequest)
-        return
-      }
 
-      err := _gs.ChallengeContinuation()
+      err := _gs.ChallengeContinuation(r.Cookies())
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
       }
@@ -140,17 +117,8 @@ func rebuttalHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
     case http.MethodPost:
       // it must be your turn to challenge.
-      if _, ok := _gs.GetInTurnCookie(r.Cookies()); !ok {
-        http.Error(w, "request out of turn", http.StatusBadRequest)
-        return
-      }
       r.ParseForm()
-      continuation := r.FormValue("continuation")
-      if len(continuation) == 0 {
-        http.Error(w, "no continuation provided", http.StatusBadRequest)
-        return
-      }
-      err := _gs.RebutChallenge(continuation)
+      err := _gs.RebutChallenge(r.Cookies(), r.FormValue("continuation"))
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
@@ -193,15 +161,13 @@ func heartbeatHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
 
     case http.MethodPost:
-      username, ok := _gs.GetValidCookie(r.Cookies())
-      if !ok {
-        http.Error(w, "no credentials provided", http.StatusBadRequest)
+      err := _gs.Heartbeat(r.Cookies())
+      if err != nil {
+        // they got kicked from the game & came back most likely
+        http.Error(w, "player doesn't exist", http.StatusBadRequest)
         return
       }
-      err := _gs.PlayerHeartbeat(username)
-      if err != nil {
-        http.Error(w, "unexpected error", http.StatusInternalServerError)
-      }
+      fmt.Fprint(w, "success")
 
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
@@ -214,7 +180,7 @@ func broadcastGameState() {
 
   b, err := json.Marshal(_gs)
   if err != nil {
-    panic("couldn't encode gamestate") // something's gone terribly wrong
+    panic("couldn't encode superghost") // something's gone terribly wrong
   }
   s := string(b)
   fmt.Println(s) // print all updates to game state to the console!
@@ -227,7 +193,7 @@ func broadcastGameState() {
 func intermittentlyRemoveDeadPlayers() {
   for _ = range time.Tick(time.Second) {
     go func () {
-      if _gs.RemoveDeadPlayers(30 * time.Second) {
+      if _gs.RemoveDeadPlayers(15 * time.Second) {
         broadcastGameState()
       }
     }()
@@ -235,7 +201,7 @@ func intermittentlyRemoveDeadPlayers() {
 }
 
 func init() {
-  _gs = gamestate.NewGameState()
+  _gs = superghost.NewGameState()
   _listeners = make([]chan string, 0)
   go intermittentlyRemoveDeadPlayers()
 }

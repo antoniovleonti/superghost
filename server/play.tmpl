@@ -1,7 +1,7 @@
 <html>
 
 <head>
-<title>Superghost test</title>
+<title>Superghost</title>
 </head>
 
 <body>
@@ -33,7 +33,7 @@ Challenge
 Rebut challenge
 <form method="POST" action="/rebuttal" id="rebutForm">
   <fieldset id=rebutFieldSet disabled>
-    <input type="text" name="continuation">
+    <input type="text" name="continuation" pattern="[a-z]+">
     <input type="submit" value="submit">
   </fieldset>
 </form>
@@ -111,10 +111,10 @@ setInterval(function() {
   var xhr = new XMLHttpRequest()
 	xhr.onload = function() {
 		if (xhr.status != 200) {
-			return // I should probably do something useful here
+      window.location.href = "/join"
 		}
 	}
-  xhr.open("POST", "/heartbeat")
+  xhr.open("POST", "/heartbeat?" + new Date().getTime())
   xhr.send()
 }, 100) // every 100 ms
 

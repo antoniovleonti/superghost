@@ -1,9 +1,7 @@
-package gamestate
+package superghost
 
 import(
-  "encoding/base64"
   "encoding/json"
-  "math/rand"
   "net/http"
   "time"
 )
@@ -38,25 +36,5 @@ func NewPlayer(username string) *Player {
   p.cookie = newCookie(username)
   p.lastHeartbeat = time.Now()
   return p
-}
-
-func newCookie(username string) *http.Cookie {
-  randomBytes := make([]byte, 32)
-  _, err := rand.Read(randomBytes)
-  if err != nil {
-    panic(err)
-  }
-  cookieVal := base64.StdEncoding.EncodeToString(randomBytes)[:32]
-
-  c := new(http.Cookie)
-  c.Name = username
-  c.Value = cookieVal
-  c.Expires = time.Now().Add(24 * time.Hour)
-  c.Path = "/"
-  return c
-}
-
-func init() {
-  rand.Seed(time.Now().UnixNano())
 }
 
