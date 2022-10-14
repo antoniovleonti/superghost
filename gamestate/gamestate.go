@@ -1,12 +1,13 @@
 package gamestate
 
 import (
-  "net/http"
-  "sync"
-  "strings"
-  "errors"
   "encoding/json"
+  "errors"
   "fmt"
+  "net/http"
+  "strings"
+  "sync"
+  "time"
 )
 
 type GamePhase int
@@ -18,11 +19,11 @@ const (
 func (p GamePhase) String() string {
   switch p {
     case kEdit:
-      return "kEdit"
+      return "edit"
     case kRebut:
-      return "kRebut"
+      return "rebut"
     case kInsufficientPlayers:
-      return "kInsufficientPlayers"
+      return "insufficient players"
     default:
       panic("unsupported value!")
   }
@@ -34,17 +35,18 @@ type GameState struct {
   usernameToPlayer map[string]*Player
   word string
   phase GamePhase
-  nextPlayer uint
+  nextPlayer int
   lastPlayer string
-  firstPlayer uint
+  firstPlayer int
 }
+
 type JGameState struct { // publicly visible version of gamestate
   Players []*Player  `json:"players"`
   Word string       `json:"word"`
   Phase string   `json:"phase"`
-  NextPlayer uint   `json:"nextPlayer"`
+  NextPlayer int   `json:"nextPlayer"`
   LastPlayer string `json:"lastPlayer"`
-  FirstPlayer uint  `json:"firstPlayer"`
+  FirstPlayer int  `json:"firstPlayer"`
 }
 
 func (gs *GameState) MarshalJSON() ([]byte, error) {
@@ -55,9 +57,9 @@ func (gs *GameState) MarshalJSON() ([]byte, error) {
     Players: gs.players,
     Word: gs.word,
     Phase: gs.phase.String(),
-    NextPlayer: gs.nextPlayer % uint(len(gs.players)),
+    NextPlayer: gs.nextPlayer,
     LastPlayer: gs.lastPlayer,
-    FirstPlayer: gs.firstPlayer % uint(len(gs.players)),
+    FirstPlayer: gs.firstPlayer,
   })
 }
 
@@ -80,8 +82,12 @@ func (gs *GameState) AffixWord(prefix string, suffix string) (string, error) {
                                        gs.phase.String()))
   }
   gs.word = prefix + gs.word + suffix
-  gs.lastPlayer = gs.players[gs.nextPlayer % uint(len(gs.players))].username
-  gs.nextPlayer++
+  gs.lastPlayer = gs.players[gs.nextPlayer].username
+  if len(gs.players) == 0 {
+    gs.nextPlayer = 0 // Probably shouldn't be possible but just to be safe
+  } else {
+    gs.nextPlayer = (gs.nextPlayer + 1) % len(gs.players)
+  }
   return gs.word, nil
 }
 
@@ -127,7 +133,7 @@ func (gs *GameState) isInTurnCookie(cookie *http.Cookie) bool {
   gs.mutex.RLock()
   defer gs.mutex.RUnlock()
 
-  p := gs.players[gs.nextPlayer % uint(len(gs.players))]
+  p := gs.players[gs.nextPlayer % len(gs.players)]
   return (p.username == cookie.Name) && (p.cookie.Value == cookie.Value)
 }
 
@@ -142,11 +148,6 @@ func (gs *GameState) AddPlayer(username string) (*http.Cookie, error) {
   }
   p := NewPlayer(username)
 
-  if (len(gs.players) > 0) {
-    gs.nextPlayer %= uint(len(gs.players))
-    gs.firstPlayer %= uint(len(gs.players))
-  }
-
   gs.usernameToPlayer[username] = p
   gs.players = append(gs.players, p)
   if len(gs.players) >= 2 && gs.phase == kInsufficientPlayers {
@@ -156,12 +157,16 @@ func (gs *GameState) AddPlayer(username string) (*http.Cookie, error) {
     gs.phase = kInsufficientPlayers
     gs.newRound()
   }
-  return p.GetCookie(), nil
+  return p.cookie, nil
 }
 
 func (gs *GameState) newRound() {
   gs.word = ""
-  gs.firstPlayer++
+  if len(gs.players) == 0 {
+    gs.firstPlayer = 0
+  } else {
+    gs.firstPlayer = gs.firstPlayer + 1 % len(gs.players)
+  }
   gs.lastPlayer = ""
   gs.nextPlayer = gs.firstPlayer
   gs.phase = kEdit
@@ -185,7 +190,7 @@ func (gs *GameState) ChallengeIsWord() error {
       p.score++
     }
   } else {
-    gs.players[gs.nextPlayer % uint(len(gs.players))].score++
+    gs.players[gs.nextPlayer % len(gs.players)].score++
   }
   gs.newRound()
   return nil
@@ -206,14 +211,14 @@ func (gs *GameState) ChallengeContinuation() error {
   for i, p := range gs.players {
     if p.username == gs.lastPlayer {
       foundLastPlayer = true
-      gs.nextPlayer = uint(i)
+      gs.nextPlayer = i
     }
   }
   if !foundLastPlayer {
     gs.newRound()
   }
 
-  gs.lastPlayer = gs.players[tmpNextPlayer % uint(len(gs.players))].username
+  gs.lastPlayer = gs.players[tmpNextPlayer % len(gs.players)].username
   gs.phase = kRebut
   return nil
 }
@@ -240,11 +245,58 @@ func (gs *GameState) RebutChallenge(continuation string) error {
       p.score++
     }
   } else {
-    gs.players[gs.nextPlayer % uint(len(gs.players))].score++
+    gs.players[gs.nextPlayer % len(gs.players)].score++
   }
   gs.newRound()
   return nil
 }
+
+// returns true if any players are removed, false otherwise
+func (gs *GameState) RemoveDeadPlayers(duration time.Duration) bool {
+  gs.mutex.Lock()
+  defer gs.mutex.Unlock()
+
+  didRemovePlayer := false
+  for i := len(gs.players) - 1; i >= 0; i-- {
+    if time.Since(gs.players[i].lastHeartbeat) > duration {
+      fmt.Println(time.Since(gs.players[i].lastHeartbeat))
+      gs.removeDeadPlayer(i)
+      didRemovePlayer = true
+    }
+  }
+  return didRemovePlayer
+}
+
+func (gs *GameState) removeDeadPlayer(index int) {
+  if index < gs.nextPlayer {
+    gs.nextPlayer--
+  }
+  if index < gs.firstPlayer {
+    gs.firstPlayer--
+  }
+  fmt.Println(gs.players[index].username)
+
+  delete(gs.usernameToPlayer, gs.players[index].username)
+
+  if (index == len(gs.players) - 1) {
+    gs.players = gs.players[:index]
+  } else {
+    gs.players = append(gs.players[:index], gs.players[index+1:]...)
+  }
+}
+
+func (gs *GameState) PlayerHeartbeat(username string) error {
+  gs.mutex.Lock()
+  defer gs.mutex.Unlock()
+
+  p, ok := gs.usernameToPlayer[username]
+  if !ok {
+    return errors.New("player does not exist")
+  }
+  p.heartbeat()
+  return nil
+}
+
 
 // Generated by https://mholt.github.io/json-to-go/
 // type Entry []struct {

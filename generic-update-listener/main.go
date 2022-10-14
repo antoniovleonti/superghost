@@ -6,6 +6,7 @@ import (
   "html/template"
   "log"
   "net/http"
+  "time"
   "superghost/gamestate"
   "sync"
   "regexp"
@@ -56,7 +57,6 @@ func joinHandler(w http.ResponseWriter, r *http.Request) {
         http.Error(w, "username must be alphanumeric", http.StatusBadRequest)
         return
       }
-      fmt.Println(r.FormValue("username"))
       cookie, err := _gs.AddPlayer(r.FormValue("username"))
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
@@ -82,13 +82,12 @@ func wordHandler(w http.ResponseWriter, r *http.Request) {
       }
       r.ParseForm()
 
-      word, err := _gs.AffixWord(r.FormValue("prefix"), r.FormValue("suffix"))
+      _, err := _gs.AffixWord(r.FormValue("prefix"), r.FormValue("suffix"))
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
       }
 
-      fmt.Printf("new word: '%s'\n", word)
       fmt.Fprint(w, "success")
       broadcastGameState()
 
@@ -190,6 +189,25 @@ func nextStateHandler(w http.ResponseWriter, r *http.Request) {
   }
 }
 
+func heartbeatHandler(w http.ResponseWriter, r *http.Request) {
+  switch r.Method {
+
+    case http.MethodPost:
+      username, ok := _gs.GetValidCookie(r.Cookies())
+      if !ok {
+        http.Error(w, "no credentials provided", http.StatusBadRequest)
+        return
+      }
+      err := _gs.PlayerHeartbeat(username)
+      if err != nil {
+        http.Error(w, "unexpected error", http.StatusInternalServerError)
+      }
+
+    default:
+      http.Error(w, "", http.StatusMethodNotAllowed)
+  }
+}
+
 func broadcastGameState() {
   _listenersMutex.Lock()
   defer _listenersMutex.Unlock()
@@ -198,17 +216,28 @@ func broadcastGameState() {
   if err != nil {
     panic("couldn't encode gamestate") // something's gone terribly wrong
   }
-  s := string(b) // print all updates to game state to the console!
-  fmt.Println(s)
+  s := string(b)
+  fmt.Println(s) // print all updates to game state to the console!
   for _, c := range _listeners {
     c <- s
   }
   _listeners = make([]chan string, 0) // clear
 }
 
+func intermittentlyRemoveDeadPlayers() {
+  for _ = range time.Tick(time.Second) {
+    go func () {
+      if _gs.RemoveDeadPlayers(30 * time.Second) {
+        broadcastGameState()
+      }
+    }()
+  }
+}
+
 func init() {
   _gs = gamestate.NewGameState()
   _listeners = make([]chan string, 0)
+  go intermittentlyRemoveDeadPlayers()
 }
 
 func main() {
@@ -220,6 +249,7 @@ func main() {
   http.HandleFunc("/challenge-is-word", challengeIsWordHandler)
   http.HandleFunc("/challenge-continuation", challengeContinuationHandler)
   http.HandleFunc("/rebuttal", rebuttalHandler)
+  http.HandleFunc("/heartbeat", heartbeatHandler)
 
 
   err := http.ListenAndServe(":9090", nil) // setting listening port

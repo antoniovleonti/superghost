@@ -12,7 +12,6 @@
 
 <h2>Actions</h2>
 
-<div id="updateDiv">
 Update word
 <form method="POST" action="/word" id="affixForm">
   <fieldset id="affixFieldSet" disabled=true>
@@ -22,9 +21,7 @@ Update word
     <input type="submit" value="submit">
   </fieldset>
 </form>
-</div>
 
-<div id="challengeDiv">
 Challenge
 <form method="POST" action="/challenge-is-word">
 	<fieldset id="challengeFieldSet" disabled=true>
@@ -32,9 +29,7 @@ Challenge
 		<button type="button" id="noContinuationButton">there's no continuation</button>
 	</fieldset>
 </form>
-</div>
 
-<div id="rebutDiv">
 Rebut challenge
 <form method="POST" action="/rebuttal" id="rebutForm">
   <fieldset id=rebutFieldSet disabled>
@@ -42,11 +37,9 @@ Rebut challenge
     <input type="submit" value="submit">
   </fieldset>
 </form>
-</div>
 
-<h2>Players:</h2>
-<ol id="playerList">
-</ol>
+<h2>Players</h2>
+<ol id="playerList">empty</ol>
 
 </body>
 
@@ -114,6 +107,17 @@ noContinuationButton.addEventListener("click", function(e){
   xhr.send()
 })
 
+setInterval(function() {
+  var xhr = new XMLHttpRequest()
+	xhr.onload = function() {
+		if (xhr.status != 200) {
+			return // I should probably do something useful here
+		}
+	}
+  xhr.open("POST", "/heartbeat")
+  xhr.send()
+}, 100) // every 100 ms
+
 function longPollNextGameState () {
   var xhr = new XMLHttpRequest()
   xhr.onload = function () {
@@ -143,13 +147,13 @@ function renderEverything(gameState) {
   renderWord(gameState.word)
   if (gameState.players[gameState.nextPlayer].username == myUsername) {
     switch (gameState.phase) {
-      case "kEdit":
+      case "edit":
         enterEditMode()
         break;
-      case "kRebut":
+      case "rebut":
         enterRebuttalMode()
         break
-      case "kInsufficientPlayers":
+      case "insufficient players":
         enterReadonlyMode()
         break
     }
@@ -162,7 +166,6 @@ function renderPlayers(players, nextPlayer) {
 	let youEmoji = String.fromCodePoint(0x1FAF5)
 	let activeEmoji = String.fromCodePoint(0x1F58B)
   playerList = document.getElementById("playerList")
-  console.log(nextPlayer)
   playerList.innerHTML = "" // clear
   for (let i = 0; i < players.length; i++) {
     var node = document.createElement("li")

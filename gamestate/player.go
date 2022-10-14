@@ -1,17 +1,18 @@
 package gamestate
 
 import(
-  "net/http"
-  "math/rand"
   "encoding/base64"
-  "time"
   "encoding/json"
+  "math/rand"
+  "net/http"
+  "time"
 )
 
 type Player struct {
   username string
   score uint
   cookie *http.Cookie
+  lastHeartbeat time.Time
 }
 
 type JPlayer struct {
@@ -26,15 +27,20 @@ func (p *Player) MarshalJSON() ([]byte, error) {
   })
 }
 
+func (p *Player) heartbeat() {
+  p.lastHeartbeat = time.Now()
+}
+
 func NewPlayer(username string) *Player {
   p := new(Player)
   p.username = username
   p.score = 0
-  p.cookie = NewCookie(username)
+  p.cookie = newCookie(username)
+  p.lastHeartbeat = time.Now()
   return p
 }
 
-func NewCookie(username string) *http.Cookie {
+func newCookie(username string) *http.Cookie {
   randomBytes := make([]byte, 32)
   _, err := rand.Read(randomBytes)
   if err != nil {
@@ -48,10 +54,6 @@ func NewCookie(username string) *http.Cookie {
   c.Expires = time.Now().Add(24 * time.Hour)
   c.Path = "/"
   return c
-}
-
-func (p *Player) GetCookie() *http.Cookie {
-  return p.cookie
 }
 
 func init() {
