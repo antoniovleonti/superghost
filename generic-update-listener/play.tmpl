@@ -14,11 +14,8 @@
 
 <div id="updateDiv">
 Update word
-<form method="POST"
-      action="/word"
-      onsubmit="return affixLetterAndResetForm(this);"
-      id="affixLetterForm">
-  <fieldset id="editWordFields" disabled=true>
+<form method="POST" action="/word" id="affixForm">
+  <fieldset id="affixFieldSet" disabled=true>
     <input type="text" name="prefix" maxlength="1" size="1">
     <span id="word"></span>
     <input type="text" name="suffix" maxlength="1" size="1">
@@ -29,29 +26,17 @@ Update word
 
 <div id="challengeDiv">
 Challenge
-<form method="POST"
-      action="/challenge-is-word"
-      onsubmit="return challengeIsWord(this);"
-      id="challengeIsWordForm">
-  <input type="submit"
-      id="challengeLastLetterButton"
-      value="challange; this is a word">
-</form>
-
-<form method="POST"
-      action="/challenge-continuation"
-      onsubmit="return challengeContinuation(this);"
-      id="challengeContinuationForm">
-  <input type="submit" id="challengeContinuationButton" value="challange; no continuation">
+<form method="POST" action="/challenge-is-word">
+	<fieldset id="challengeFieldSet" disabled=true>
+		<button type="button" id="isWordButton">this is a word</button>
+		<button type="button" id="noContinuationButton">there's no continuation</button>
+	</fieldset>
 </form>
 </div>
 
 <div id="rebutDiv">
 Rebut challenge
-<form method="POST"
-      action="/rebuttal"
-      onsubmit="return rebut(this);"
-      id="rebutForm">
+<form method="POST" action="/rebuttal" id="rebutForm">
   <fieldset id=rebutFieldSet disabled>
     <input type="text" name="continuation">
     <input type="submit" value="submit">
@@ -69,41 +54,65 @@ Rebut challenge
 
 const myUsername = "{{.Username}}"
 
-function affixLetterAndResetForm (form) {
+const affixForm = document.getElementById("affixForm")
+const rebutForm = document.getElementById("rebutForm")
+
+const affixFieldSet = document.getElementById("affixFieldSet")
+const challengeFieldSet = document.getElementById("challengeFieldSet")
+const rebutFieldSet = document.getElementById("rebutFieldSet")
+
+affixForm.addEventListener("submit", function(e){
+  e.preventDefault() // do not redirect
   var xhr = new XMLHttpRequest()
+	xhr.onload = function() {
+		if (xhr.status != 200) {
+			console.log(xhr.responseText)
+			return // I should probably do something useful here
+		}
+		affixForm.reset()
+	}
   xhr.open("POST", "/word")
-  xhr.send(new URLSearchParams(new FormData(form)))
-  form.reset()
+  xhr.send(new URLSearchParams(new FormData(affixForm)))
+})
 
-  return false
-}
-
-function challengeIsWord(form) {
+rebutForm.addEventListener("submit", function(e){
+  e.preventDefault() // do not redirect
   var xhr = new XMLHttpRequest()
+	xhr.onload = function() {
+		if (xhr.status != 200) {
+			console.log(xhr.responseText)
+			return // I should probably do something useful here
+		}
+		rebutForm.reset()
+	}
+  xhr.open("POST", "/rebuttal")
+  xhr.send(new URLSearchParams(new FormData(rebutForm)))
+})
+
+isWordButton.addEventListener("click", function(e){
+  e.preventDefault() // do not redirect
+  var xhr = new XMLHttpRequest()
+	xhr.onload = function() {
+		if (xhr.status != 200) {
+			console.log(xhr.responseText)
+			return // I should probably do something useful here
+		}
+	}
   xhr.open("POST", "/challenge-is-word")
   xhr.send()
+})
 
-  return false
-}
-
-function challengeContinuation(form) {
+noContinuationButton.addEventListener("click", function(e){
+  e.preventDefault() // do not redirect
   var xhr = new XMLHttpRequest()
+	xhr.onload = function() {
+		if (xhr.status != 200) {
+			return // I should probably do something useful here
+		}
+	}
   xhr.open("POST", "/challenge-continuation")
   xhr.send()
-
-  return false
-}
-
-function rebut(form) {
-  var xhr = new XMLHttpRequest()
-  xhr.onload =  function () {
-    console.log(xhr.responseText)
-  }
-  xhr.open("POST", "/rebuttal")
-  xhr.send(new URLSearchParams(new FormData(form)))
-
-  return false
-}
+})
 
 function longPollNextGameState () {
   var xhr = new XMLHttpRequest()
@@ -128,27 +137,30 @@ function getCurrentGameState () {
   xhr.send()
 }
 
+// TODO: clean this up
 function renderEverything(gameState) {
   renderPlayers(gameState.players, gameState.nextPlayer)
   renderWord(gameState.word)
   if (gameState.players[gameState.nextPlayer].username == myUsername) {
     switch (gameState.phase) {
       case "kEdit":
-        renderMyTurn()
+        enterEditMode()
         break;
       case "kRebut":
-        renderMyRebuttal()
+        enterRebuttalMode()
         break
       case "kInsufficientPlayers":
-        renderNotMyTurn()
+        enterReadonlyMode()
         break
     }
   } else {
-    renderNotMyTurn()
+    enterReadonlyMode()
   }
 }
 
 function renderPlayers(players, nextPlayer) {
+	let youEmoji = String.fromCodePoint(0x1FAF5)
+	let activeEmoji = String.fromCodePoint(0x1F58B)
   playerList = document.getElementById("playerList")
   console.log(nextPlayer)
   playerList.innerHTML = "" // clear
@@ -156,41 +168,30 @@ function renderPlayers(players, nextPlayer) {
     var node = document.createElement("li")
     var playerStr = players[i].username + " "
         + players[i].score
-        + ((players[i].username == myUsername) ? " 🫵" : "")
-        + ((i == nextPlayer) ? " ✍️" : "")
+        + ((players[i].username == myUsername) ? youEmoji : "")
+        + ((i == nextPlayer) ? activeEmoji : "" )
     node.appendChild(document.createTextNode(playerStr))
     playerList.appendChild(node)
   }
 }
 
-function renderMyTurn() {
+function enterEditMode() {
   // enable editor
-  document.getElementById("editWordFields").disabled=false
-  // enable challenge buttons
-  document.getElementById("challengeContinuationButton").disabled=false
-  document.getElementById("challengeLastLetterButton").disabled=false
-  // disable rebut inputs
-  document.getElementById("rebutFieldSet").disabled=true
+  affixFieldSet.disabled=false
+  challengeFieldSet.disabled=false
+  rebutFieldSet.disabled=true
 }
 
-function renderNotMyTurn() {
-  // enable editor
-  document.getElementById("editWordFields").disabled=true
-  // enable challenge buttons
-  document.getElementById("challengeContinuationButton").disabled=true
-  document.getElementById("challengeLastLetterButton").disabled=true
-  // disable rebut inputs
-  document.getElementById("rebutFieldSet").disabled=true
+function enterReadonlyMode() {
+  affixFieldSet.disabled=true
+  challengeFieldSet.disabled=true
+  rebutFieldSet.disabled=true
 }
 
-function renderMyRebuttal() {
-  // enable editor
-  document.getElementById("editWordFields").disabled=true
-  // enable challenge buttons
-  document.getElementById("challengeContinuationButton").disabled=true
-  document.getElementById("challengeLastLetterButton").disabled=true
-  // disable rebut inputs
-  document.getElementById("rebutFieldSet").disabled=false
+function enterRebuttalMode() {
+  affixFieldSet.disabled=true
+  challengeFieldSet.disabled=true
+  rebutFieldSet.disabled=false
 }
 
 function renderWord(word) {

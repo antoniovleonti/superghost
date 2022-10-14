@@ -107,7 +107,6 @@ func challengeIsWordHandler(w http.ResponseWriter, r *http.Request) {
       }
 
       err := _gs.ChallengeIsWord()
-      fmt.Println("I MADE IT")
       if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
       }
