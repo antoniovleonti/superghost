@@ -134,7 +134,7 @@ function getCurrentGameState () {
   var xhr = new XMLHttpRequest()
   xhr.onload = function () {
     var state = JSON.parse(xhr.responseText)
-    console.log(xhr.responseText)
+    console.log(state)
     renderEverything(state)
   }
   xhr.open("GET", "/state")

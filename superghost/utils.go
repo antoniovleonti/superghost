@@ -11,35 +11,6 @@ import(
 var _alphanumPattern *regexp.Regexp
 var _lowerPattern *regexp.Regexp
 
-type GameConfig struct {
-  maxPlayers int
-  minWordLength int
-}
-
-type SuperGhostGame struct {
-  State *GameState
-  config *GameConfig
-}
-
-func NewSuperGhostGame(config GameConfig) *SuperGhostGame {
-  gs := new(GameState)
-  gs.players = make([]*Player, 0)
-  gs.usernameToPlayer = make(map[string]*Player)
-  gs.mode = kInsufficientPlayers
-  gs.nextPlayer = 0
-  gs.lastPlayer = ""
-  gs.firstPlayer = 0
-  // copy config
-  gc := new(GameConfig)
-  gc.maxPlayers = config.maxPlayers
-  gc.minWordLength = gc.minWordLength
-
-  sgg := new(SuperGhostGame)
-  sgg.State = gs
-  sgg.config = gc
-  return sgg
-}
-
 func validateWord(word string) (isWord bool, err error) {
   reqUri := "https://api.dictionaryapi.dev/api/v2/entries/en/" + word
   resp, err := http.Get(reqUri)

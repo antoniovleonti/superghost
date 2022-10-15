@@ -75,7 +75,126 @@ func NewGameState() *GameState {
   return gs
 }
 
-func (gs *GameState) AffixWord(
+func (gs *GameState) getValidCookie(cookies []*http.Cookie) (string, bool) {
+  for _, cookie := range cookies {
+    if gs.isValidCookie(cookie) {
+      return cookie.Name, true
+    }
+  }
+  return "", false
+}
+
+func (gs *GameState) addPlayer(username string) (*http.Cookie, error) {
+  gs.mutex.Lock()
+  defer gs.mutex.Unlock()
+  // sanitize & validate username
+  match := _alphanumPattern.MatchString(username)
+  if !match {
+    return nil, errors.New("username must be alphanumeric")
+  }
+  if _, ok := gs.usernameToPlayer[username]; ok {
+    return nil, fmt.Errorf("username '%s' already in use", username)
+  }
+
+  p := NewPlayer(username)
+  gs.usernameToPlayer[username] = p
+  gs.players = append(gs.players, p)
+  if len(gs.players) >= 2 && gs.mode == kInsufficientPlayers {
+    gs.mode = kEdit
+  }
+  if len(gs.players) < 2 {
+    gs.mode = kInsufficientPlayers
+    gs.newRound()
+  }
+  return p.cookie, nil
+}
+
+func (gs *GameState) challengeIsWord(cookies []*http.Cookie) error {
+  if _, ok := gs.getInTurnCookie(cookies); !ok {
+    return fmt.Errorf("it is not your turn")
+  }
+  gs.mutex.Lock()
+  defer gs.mutex.Unlock()
+
+  if gs.mode != kEdit {
+    return fmt.Errorf("cannot challenge in %s mode", gs.mode.String())
+  }
+
+  isWord, err := validateWord(gs.word)
+  if err != nil {
+    return err
+  }
+  if isWord {
+    if p, ok := gs.usernameToPlayer[gs.lastPlayer]; ok {
+      p.score++
+    }
+  } else {
+    gs.players[gs.nextPlayer % len(gs.players)].score++
+  }
+  gs.newRound()
+  return nil
+}
+
+func (gs *GameState) challengeContinuation(cookies []*http.Cookie) error {
+  gs.mutex.Lock()
+  defer gs.mutex.Unlock()
+
+  if _, ok := gs.getInTurnCookie(cookies); !ok {
+    return fmt.Errorf("it is not your turn")
+  }
+  if gs.mode != kEdit {
+    return fmt.Errorf("cannot challenge in %s mode", gs.mode.String())
+  }
+
+  tmpNextPlayer := gs.nextPlayer
+  foundLastPlayer := false
+  // make sure the challenged player hasn't left
+  for i, p := range gs.players {
+    if p.username == gs.lastPlayer {
+      foundLastPlayer = true
+      gs.nextPlayer = i
+    }
+  }
+  if !foundLastPlayer {
+    gs.newRound()
+  }
+
+  gs.lastPlayer = gs.players[tmpNextPlayer % len(gs.players)].username
+  gs.mode = kRebut
+  return nil
+}
+
+func (gs *GameState) rebutChallenge(
+    cookies []*http.Cookie, continuation string) error {
+  if gs.mode != kRebut {
+    return fmt.Errorf("cannot rebut in %s mode", gs.mode.String())
+  }
+  if _, ok := gs.getInTurnCookie(cookies); !ok {
+    return fmt.Errorf("it is not your turn")
+  }
+  continuation = strings.TrimSpace(continuation)
+  if !strings.Contains(continuation, gs.word) {
+    return errors.New("continuation must contain current substring")
+  }
+  // check if it is a word
+  isWord, err := validateWord(continuation)
+  if err != nil {
+    return err
+  }
+  // update game state accordingly
+  if isWord {
+    // challenger gets a letter
+    if p, ok := gs.usernameToPlayer[gs.lastPlayer]; ok {
+      p.score++
+    }
+  } else {
+    gs.players[gs.nextPlayer % len(gs.players)].score++
+  }
+  gs.newRound()
+  return nil
+}
+
+func (gs *GameState) affixWord(
     cookies []*http.Cookie, prefix string, suffix string) error {
   gs.mutex.RLock()
   if gs.mode != kEdit {
@@ -109,13 +228,20 @@ func (gs *GameState) AffixWord(
   return nil
 }
 
-func (gs *GameState) GetValidCookie(cookies []*http.Cookie) (string, bool) {
-  for _, cookie := range cookies {
-    if gs.isValidCookie(cookie) {
-      return cookie.Name, true
-    }
+func (gs *GameState) heartbeat(cookies []*http.Cookie) error {
+  username, ok := gs.getValidCookie(cookies) // needs mutex
+  if !ok {
+    return fmt.Errorf("no credentials provided")
   }
-  return "", false
+  gs.mutex.Lock()
+  defer gs.mutex.Unlock()
+
+  p, ok := gs.usernameToPlayer[username]
+  if !ok {
+    return fmt.Errorf("player does not exist")
+  }
+  p.heartbeat()
+  return nil
 }
 
 func (gs *GameState) isValidCookie(cookie *http.Cookie) bool {
@@ -146,30 +272,6 @@ func (gs *GameState) isInTurnCookie(cookie *http.Cookie) bool {
   return (p.username == cookie.Name) && (p.cookie.Value == cookie.Value)
 }
 
-func (gs *GameState) AddPlayer(username string) (*http.Cookie, error) {
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
-  // sanitize & validate username
-  match := _alphanumPattern.MatchString(username)
-  if !match {
-    return nil, errors.New("username must be alphanumeric")
-  }
-  if _, ok := gs.usernameToPlayer[username]; ok {
-    return nil, fmt.Errorf("username '%s' already in use", username)
-  }
-
-  p := NewPlayer(username)
-  gs.usernameToPlayer[username] = p
-  gs.players = append(gs.players, p)
-  if len(gs.players) >= 2 && gs.mode == kInsufficientPlayers {
-    gs.mode = kEdit
-  }
-  if len(gs.players) < 2 {
-    gs.mode = kInsufficientPlayers
-    gs.newRound()
-  }
-  return p.cookie, nil
-}
 
 func (gs *GameState) newRound() {
   gs.word = ""
@@ -187,93 +289,8 @@ func (gs *GameState) newRound() {
   }
 }
 
-func (gs *GameState) ChallengeIsWord(cookies []*http.Cookie) error {
-  if _, ok := gs.getInTurnCookie(cookies); !ok {
-    return fmt.Errorf("it is not your turn")
-  }
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
-
-  if gs.mode != kEdit {
-    return fmt.Errorf("cannot challenge in %s mode", gs.mode.String())
-  }
-
-  isWord, err := validateWord(gs.word)
-  if err != nil {
-    return err
-  }
-  if isWord {
-    if p, ok := gs.usernameToPlayer[gs.lastPlayer]; ok {
-      p.score++
-    }
-  } else {
-    gs.players[gs.nextPlayer % len(gs.players)].score++
-  }
-  gs.newRound()
-  return nil
-}
-
-func (gs *GameState) ChallengeContinuation(cookies []*http.Cookie) error {
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
-
-  if _, ok := gs.getInTurnCookie(cookies); !ok {
-    return fmt.Errorf("it is not your turn")
-  }
-  if gs.mode != kEdit {
-    return fmt.Errorf("cannot challenge in %s mode", gs.mode.String())
-  }
-
-  tmpNextPlayer := gs.nextPlayer
-  foundLastPlayer := false
-  // make sure the challenged player hasn't left
-  for i, p := range gs.players {
-    if p.username == gs.lastPlayer {
-      foundLastPlayer = true
-      gs.nextPlayer = i
-    }
-  }
-  if !foundLastPlayer {
-    gs.newRound()
-  }
-
-  gs.lastPlayer = gs.players[tmpNextPlayer % len(gs.players)].username
-  gs.mode = kRebut
-  return nil
-}
-
-func (gs *GameState) RebutChallenge(
-    cookies []*http.Cookie, continuation string) error {
-  if gs.mode != kRebut {
-    return fmt.Errorf("cannot rebut in %s mode", gs.mode.String())
-  }
-  if _, ok := gs.getInTurnCookie(cookies); !ok {
-    return fmt.Errorf("it is not your turn")
-  }
-  continuation = strings.TrimSpace(continuation)
-  if !strings.Contains(continuation, gs.word) {
-    return errors.New("continuation must contain current substring")
-  }
-  // check if it is a word
-  isWord, err := validateWord(continuation)
-  if err != nil {
-    return err
-  }
-  // update game state accordingly
-  if isWord {
-    // challenger gets a letter
-    if p, ok := gs.usernameToPlayer[gs.lastPlayer]; ok {
-      p.score++
-    }
-  } else {
-    gs.players[gs.nextPlayer % len(gs.players)].score++
-  }
-  gs.newRound()
-  return nil
-}
-
 // returns true if any players are removed, false otherwise
-func (gs *GameState) RemoveDeadPlayers(duration time.Duration) bool {
+func (gs *GameState) removeDeadPlayers(duration time.Duration) bool {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
@@ -307,7 +324,7 @@ func (gs *GameState) removePlayer(index int) {
 }
 
 func (gs *GameState) Heartbeat(cookies []*http.Cookie) error {
-  username, ok := gs.GetValidCookie(cookies) // needs mutex
+  username, ok := gs.getValidCookie(cookies) // needs mutex
   if !ok {
     return fmt.Errorf("no credentials provided")
   }

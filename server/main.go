@@ -1,26 +1,25 @@
 package main
 
 import (
-  "encoding/json"
   "fmt"
   "html/template"
   "log"
   "net/http"
-  "time"
   "superghost"
   "sync"
+  "time"
 )
 
 var _listeners []chan string
 var _listenersMutex sync.RWMutex
 
-var _gs *superghost.GameState
+var _sgg *superghost.SuperGhostGame
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
 
     case http.MethodGet:
-      username, ok := _gs.GetValidCookie(r.Cookies())
+      username, ok := _sgg.GetValidCookie(r.Cookies())
       if !ok {
         http.Redirect(w, r, "/join", http.StatusFound)
         return
@@ -35,7 +34,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func joinHandler(w http.ResponseWriter, r *http.Request) {
-  if _, ok := _gs.GetValidCookie(r.Cookies()); ok {
+  if _, ok := _sgg.GetValidCookie(r.Cookies()); ok {
     http.Redirect(w, r, "/", http.StatusFound)
     return
   }
@@ -48,7 +47,7 @@ func joinHandler(w http.ResponseWriter, r *http.Request) {
 
     case http.MethodPost:
       r.ParseForm()
-      cookie, err := _gs.AddPlayer(r.FormValue("username"))
+      cookie, err := _sgg.AddPlayer(r.FormValue("username"))
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
@@ -68,7 +67,7 @@ func wordHandler(w http.ResponseWriter, r *http.Request) {
 
     case http.MethodPost:
       r.ParseForm()
-      err := _gs.AffixWord(r.Cookies(), r.FormValue("prefix"),
+      err := _sgg.AffixWord(r.Cookies(), r.FormValue("prefix"),
                            r.FormValue("suffix"))
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
@@ -86,7 +85,7 @@ func challengeIsWordHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
 
     case http.MethodPost:
-      err := _gs.ChallengeIsWord(r.Cookies())
+      err := _sgg.ChallengeIsWord(r.Cookies())
       if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
       }
@@ -102,7 +101,7 @@ func challengeContinuationHandler(w http.ResponseWriter, r *http.Request) {
     case http.MethodPost:
       // it must be your turn to challenge.
 
-      err := _gs.ChallengeContinuation(r.Cookies())
+      err := _sgg.ChallengeContinuation(r.Cookies())
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
       }
@@ -118,7 +117,7 @@ func rebuttalHandler(w http.ResponseWriter, r *http.Request) {
     case http.MethodPost:
       // it must be your turn to challenge.
       r.ParseForm()
-      err := _gs.RebutChallenge(r.Cookies(), r.FormValue("continuation"))
+      err := _sgg.RebutChallenge(r.Cookies(), r.FormValue("continuation"))
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
@@ -133,7 +132,7 @@ func rebuttalHandler(w http.ResponseWriter, r *http.Request) {
 func stateHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
     case http.MethodGet:
-      b, err := json.Marshal(_gs)
+      b, err := _sgg.GetJsonGameState()
       if err != nil {
         panic ("couldn't marshal game state")
       }
@@ -145,6 +144,7 @@ func stateHandler(w http.ResponseWriter, r *http.Request) {
 
 func nextStateHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
+
     case http.MethodGet:
       _listenersMutex.Lock()
       myChan := make(chan string)
@@ -152,6 +152,7 @@ func nextStateHandler(w http.ResponseWriter, r *http.Request) {
       _listenersMutex.Unlock()
 
       fmt.Fprint(w, <-myChan)
+
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
   }
@@ -161,7 +162,7 @@ func heartbeatHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
 
     case http.MethodPost:
-      err := _gs.Heartbeat(r.Cookies())
+      err := _sgg.Heartbeat(r.Cookies())
       if err != nil {
         // they got kicked from the game & came back most likely
         http.Error(w, "player doesn't exist", http.StatusBadRequest)
@@ -178,12 +179,12 @@ func broadcastGameState() {
   _listenersMutex.Lock()
   defer _listenersMutex.Unlock()
 
-  b, err := json.Marshal(_gs)
+  b, err := _sgg.GetJsonGameState()
   if err != nil {
     panic("couldn't encode superghost") // something's gone terribly wrong
   }
   s := string(b)
-  fmt.Println(s) // print all updates to game state to the console!
+  fmt.Println("s = " + s) // print all updates to game state to the console!
   for _, c := range _listeners {
     c <- s
   }
@@ -193,7 +194,7 @@ func broadcastGameState() {
 func intermittentlyRemoveDeadPlayers() {
   for _ = range time.Tick(time.Second) {
     go func () {
-      if _gs.RemoveDeadPlayers(15 * time.Second) {
+      if _sgg.RemoveDeadPlayers(15 * time.Second) {
         broadcastGameState()
       }
     }()
@@ -201,7 +202,11 @@ func intermittentlyRemoveDeadPlayers() {
 }
 
 func init() {
-  _gs = superghost.NewGameState()
+  _sgg = superghost.NewSuperGhostGame(superghost.GameConfig{
+    MaxPlayers: 2,
+    MinWordLength: 5,
+    IsPublic: true,
+  })
   _listeners = make([]chan string, 0)
   go intermittentlyRemoveDeadPlayers()
 }
