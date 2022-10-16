@@ -1,3 +1,3 @@
-module github.com/antoniovleonti/superghost/gamestate
+module superghost
 
 go 1.17

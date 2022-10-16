@@ -1,51 +1,6 @@
-<html>
+{{define "script"}}
 
-<head>
-<title>Superghost</title>
-</head>
-
-<body>
-
-<header>
-<h1>superghost</h1>
-</header>
-
-<h2>Actions</h2>
-
-Update word
-<form method="POST" action="/word" id="affixForm">
-  <fieldset id="affixFieldSet" disabled=true>
-    <input type="text" name="prefix" maxlength="1" size="1">
-    <span id="word"></span>
-    <input type="text" name="suffix" maxlength="1" size="1">
-    <input type="submit" value="submit">
-  </fieldset>
-</form>
-
-Challenge
-<form method="POST" action="/challenge-is-word">
-	<fieldset id="challengeFieldSet" disabled=true>
-		<button type="button" id="isWordButton">this is a word</button>
-		<button type="button" id="noContinuationButton">there's no continuation</button>
-	</fieldset>
-</form>
-
-Rebut challenge
-<form method="POST" action="/rebuttal" id="rebutForm">
-  <fieldset id=rebutFieldSet disabled>
-    <input type="text" name="continuation" pattern="[a-z]+">
-    <input type="submit" value="submit">
-  </fieldset>
-</form>
-
-<h2>Players</h2>
-<ol id="playerList">empty</ol>
-
-</body>
-
-<script>
-
-const myUsername = "{{.Username}}"
+const kMyUsername = "{{.Username}}"
 
 const affixForm = document.getElementById("affixForm")
 const rebutForm = document.getElementById("rebutForm")
@@ -122,7 +77,7 @@ function longPollNextGameState () {
   var xhr = new XMLHttpRequest()
   xhr.onload = function () {
     var state = JSON.parse(xhr.responseText)
-    console.log(xhr.responseText)
+    console.log(state)
     renderEverything(state)
     longPollNextGameState()
   }
@@ -145,7 +100,7 @@ function getCurrentGameState () {
 function renderEverything(gameState) {
   renderPlayers(gameState.players, gameState.nextPlayer)
   renderWord(gameState.word)
-  if (gameState.players[gameState.nextPlayer].username == myUsername) {
+  if (gameState.players[gameState.nextPlayer].username == kMyUsername) {
     switch (gameState.phase) {
       case "edit":
         enterEditMode()
@@ -163,16 +118,12 @@ function renderEverything(gameState) {
 }
 
 function renderPlayers(players, nextPlayer) {
-	let youEmoji = String.fromCodePoint(0x1FAF5)
-	let activeEmoji = String.fromCodePoint(0x1F58B)
   playerList = document.getElementById("playerList")
   playerList.innerHTML = "" // clear
   for (let i = 0; i < players.length; i++) {
     var node = document.createElement("li")
-    var playerStr = players[i].username + " "
-        + players[i].score
-        + ((players[i].username == myUsername) ? youEmoji : "")
-        + ((i == nextPlayer) ? activeEmoji : "" )
+    var playerStr = players[i].username + " " + players[i].score
+
     node.appendChild(document.createTextNode(playerStr))
     playerList.appendChild(node)
   }
@@ -183,18 +134,26 @@ function enterEditMode() {
   affixFieldSet.disabled=false
   challengeFieldSet.disabled=false
   rebutFieldSet.disabled=true
+
+  // change visibilities
+  rebutForm.style.display="none"
+  challengeForm.style.display="block"
 }
 
 function enterReadonlyMode() {
   affixFieldSet.disabled=true
   challengeFieldSet.disabled=true
   rebutFieldSet.disabled=true
+  rebutForm.style.display="none"
+  challengeForm.style.display="none"
 }
 
 function enterRebuttalMode() {
   affixFieldSet.disabled=true
   challengeFieldSet.disabled=true
   rebutFieldSet.disabled=false
+  rebutForm.style.display="block"
+  challengeForm.style.display="none"
 }
 
 function renderWord(word) {
@@ -204,6 +163,4 @@ function renderWord(word) {
 getCurrentGameState()
 longPollNextGameState()
 
-</script>
-
-</html>
+{{end}}

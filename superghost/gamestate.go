@@ -2,13 +2,11 @@ package superghost
 
 import (
   "encoding/json"
-  "errors"
   "fmt"
   "net/http"
   "strings"
   "sync"
   "time"
-  // "regexp"
 )
 
 type GameMode int
@@ -84,13 +82,16 @@ func (gs *GameState) getValidCookie(cookies []*http.Cookie) (string, bool) {
   return "", false
 }
 
-func (gs *GameState) addPlayer(username string) (*http.Cookie, error) {
+func (gs *GameState) addPlayer(
+    username string, maxPlayers int) (*http.Cookie, error) {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
+  if len(gs.players) >= maxPlayers {
+    return nil, fmt.Errorf("player limit reached")
+  }
   // sanitize & validate username
-  match := _alphanumPattern.MatchString(username)
-  if !match {
-    return nil, errors.New("username must be alphanumeric")
+  if !_usernamePattern.MatchString(username) {
+    return nil, fmt.Errorf("username must be alphanumeric")
   }
   if _, ok := gs.usernameToPlayer[username]; ok {
     return nil, fmt.Errorf("username '%s' already in use", username)
@@ -109,7 +110,8 @@ func (gs *GameState) addPlayer(username string) (*http.Cookie, error) {
   return p.cookie, nil
 }
 
-func (gs *GameState) challengeIsWord(cookies []*http.Cookie) error {
+func (gs *GameState) challengeIsWord(
+    cookies []*http.Cookie, minLength int) error {
   if _, ok := gs.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
   }
@@ -118,6 +120,9 @@ func (gs *GameState) challengeIsWord(cookies []*http.Cookie) error {
 
   if gs.mode != kEdit {
     return fmt.Errorf("cannot challenge in %s mode", gs.mode.String())
+  }
+  if len(gs.word) < minLength {
+    return fmt.Errorf("minimum word length not met")
   }
 
   isWord, err := validateWord(gs.word)
@@ -136,12 +141,13 @@ func (gs *GameState) challengeIsWord(cookies []*http.Cookie) error {
 }
 
 func (gs *GameState) challengeContinuation(cookies []*http.Cookie) error {
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
-
   if _, ok := gs.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
   }
+
+  gs.mutex.Lock()
+  defer gs.mutex.Unlock()
+
   if gs.mode != kEdit {
     return fmt.Errorf("cannot challenge in %s mode", gs.mode.String())
   }
@@ -165,24 +171,25 @@ func (gs *GameState) challengeContinuation(cookies []*http.Cookie) error {
 }
 
 func (gs *GameState) rebutChallenge(
-    cookies []*http.Cookie, continuation string) error {
+    cookies []*http.Cookie, continuation string, minLength int) error {
   if gs.mode != kRebut {
     return fmt.Errorf("cannot rebut in %s mode", gs.mode.String())
   }
   if _, ok := gs.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
   }
-  continuation = strings.TrimSpace(continuation)
-  if !strings.Contains(continuation, gs.word) {
-    return errors.New("continuation must contain current substring")
+  if len(continuation) < minLength {
+    return fmt.Errorf("minimum word length not met")
   }
+
   // check if it is a word
+  continuation = strings.TrimSpace(continuation)
   isWord, err := validateWord(continuation)
   if err != nil {
     return err
   }
   // update game state accordingly
-  if isWord {
+  if isWord && strings.Contains(continuation, gs.word) {
     // challenger gets a letter
     if p, ok := gs.usernameToPlayer[gs.lastPlayer]; ok {
       p.score++
@@ -205,14 +212,9 @@ func (gs *GameState) affixWord(
   if _, ok := gs.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
   }
-  if len(prefix) > 0 && len(suffix) > 0 {
-    return fmt.Errorf("only one of prefix or suffix should be specified")
-  }
-  if len(prefix) != 1 && len(suffix) != 1 {
-    return fmt.Errorf("affix must be of length 1")
-  }
-  if !_lowerPattern.MatchString(prefix) && !_lowerPattern.MatchString(suffix) {
-    return fmt.Errorf("affix must be lowercase alphabetic (no unicode)")
+  if !_affixPattern.MatchString(prefix + suffix) {
+    return fmt.Errorf(
+        "exactly one alphabetical prefix OR suffix must be provided")
   }
 
   gs.mutex.Lock()
@@ -278,7 +280,7 @@ func (gs *GameState) newRound() {
   if len(gs.players) == 0 {
     gs.firstPlayer = 0
   } else {
-    gs.firstPlayer = gs.firstPlayer + 1 % len(gs.players)
+    gs.firstPlayer = (gs.firstPlayer + 1) % len(gs.players)
   }
   gs.lastPlayer = ""
   gs.nextPlayer = gs.firstPlayer
@@ -297,10 +299,12 @@ func (gs *GameState) removeDeadPlayers(duration time.Duration) bool {
   didRemovePlayer := false
   for i := len(gs.players) - 1; i >= 0; i-- {
     if time.Since(gs.players[i].lastHeartbeat) > duration {
-      fmt.Println(time.Since(gs.players[i].lastHeartbeat))
       gs.removePlayer(i)
       didRemovePlayer = true
     }
+  }
+  if didRemovePlayer && (len(gs.players) < 2) {
+    gs.newRound()
   }
   return didRemovePlayer
 }
@@ -312,7 +316,6 @@ func (gs *GameState) removePlayer(index int) {
   if index < gs.firstPlayer {
     gs.firstPlayer--
   }
-  fmt.Println(gs.players[index].username)
 
   delete(gs.usernameToPlayer, gs.players[index].username)
 

@@ -1,0 +1,84 @@
+{{define "style"}}
+
+fieldset {
+  border: none;
+}
+
+* {
+  font-family: 'inter', sans-serif;
+}
+
+.wrapper {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  grid-template-rows: auto;
+  border: none;
+  height: 80vh;
+}
+
+.players {
+  display: block;
+  grid-column: 1;
+  grid-row: 1/-1;
+  border: none;
+  padding: 20px;
+}
+
+.forms {
+  padding: 20px;
+  grid-column: 1/-1;
+  grid-row: 1/-1;
+  border: none;
+  text-align: center;
+}
+
+input, button, li {
+  margin: 5px;
+  border: 1px solid;
+  padding: 5px;
+  border-radius: 8px;
+  background: white;
+  box-shadow: 2px 2px;
+}
+
+ul {
+  padding: 0px;
+}
+li {
+  list-style: none;
+  list-style-position: inside;
+  border-radius: 100px;
+  padding-left: 20px;
+  padding-right: 20px;
+  width: fit-content;
+  margin-left: 0px;
+}
+input[type=text] {
+  border-radius:0px;
+  box-shadow: 0px 0px;
+}
+
+#prefixText, #suffixText{
+  margin: 0px
+}
+.super{
+  font-weight: 200;
+}
+
+@media (max-width: 768px) {
+  .wrapper {
+    grid-template-columns: auto;
+    grid-template-rows: auto auto;
+  }
+  .players {
+    grid-column: 1/-1;
+    grid-row: 2;
+  }
+
+  .forms {
+    grid-column: 1/-1;
+    grid-row: 1;
+  }
+}
+
+{{end}}

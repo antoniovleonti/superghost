@@ -2,7 +2,7 @@ package main
 
 import (
   "fmt"
-  "html/template"
+  "text/template"
   "log"
   "net/http"
   "superghost"
@@ -12,7 +12,6 @@ import (
 
 var _listeners []chan string
 var _listenersMutex sync.RWMutex
-
 var _sgg *superghost.SuperGhostGame
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
@@ -24,9 +23,20 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
         http.Redirect(w, r, "/join", http.StatusFound)
         return
       }
-      t, _ := template.ParseFiles("play.tmpl")
-      t.Execute(w, struct{Username string}{Username: username})
+      t, err := template.ParseFiles("../client/play.html",
+                                    "../client/script.js",
+                                    "../client/style.css")
+      if err != nil {
+        fmt.Println(err.Error())
+        panic("panic 1")
+      }
+      err = t.Execute(w, map[string] string {"Username": username})
+      if err != nil {
+        fmt.Println(err.Error())
+        panic("panic 2")
+      }
       return
+
 
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
@@ -42,8 +52,8 @@ func joinHandler(w http.ResponseWriter, r *http.Request) {
 
     case http.MethodGet:
       // they've already joined -- redirect them back to the game
-      t, _ := template.ParseFiles("join.tmpl")
-      t.Execute(w, nil)
+      t, _ := template.ParseFiles("../client/join.html")
+      t.Execute(w, struct{GameId string}{GameId: "abc123"})
 
     case http.MethodPost:
       r.ParseForm()
@@ -99,7 +109,6 @@ func challengeIsWordHandler(w http.ResponseWriter, r *http.Request) {
 func challengeContinuationHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
     case http.MethodPost:
-      // it must be your turn to challenge.
 
       err := _sgg.ChallengeContinuation(r.Cookies())
       if err != nil {
@@ -165,7 +174,7 @@ func heartbeatHandler(w http.ResponseWriter, r *http.Request) {
       err := _sgg.Heartbeat(r.Cookies())
       if err != nil {
         // they got kicked from the game & came back most likely
-        http.Error(w, "player doesn't exist", http.StatusBadRequest)
+        http.Error(w, "couldn't find player", http.StatusNotFound)
         return
       }
       fmt.Fprint(w, "success")
@@ -221,7 +230,6 @@ func main() {
   http.HandleFunc("/challenge-continuation", challengeContinuationHandler)
   http.HandleFunc("/rebuttal", rebuttalHandler)
   http.HandleFunc("/heartbeat", heartbeatHandler)
-
 
   err := http.ListenAndServe(":9090", nil) // setting listening port
   if err != nil {

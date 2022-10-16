@@ -41,11 +41,11 @@ func (sgg *SuperGhostGame) GetValidCookie(cookies []*http.Cookie) (string,
 }
 
 func (sgg *SuperGhostGame) AddPlayer(username string) (*http.Cookie, error) {
-  return sgg.state.addPlayer(username)
+  return sgg.state.addPlayer(username, sgg.config.MaxPlayers)
 }
 
 func (sgg *SuperGhostGame) ChallengeIsWord(cookies []*http.Cookie) error {
-  return sgg.state.challengeIsWord(cookies)
+  return sgg.state.challengeIsWord(cookies, sgg.config.MinWordLength)
 }
 
 func (sgg *SuperGhostGame) ChallengeContinuation(cookies []*http.Cookie) error {
@@ -54,7 +54,8 @@ func (sgg *SuperGhostGame) ChallengeContinuation(cookies []*http.Cookie) error {
 
 func (sgg *SuperGhostGame) RebutChallenge(
     cookies []*http.Cookie, continuation string) error {
-  return sgg.state.rebutChallenge(cookies, continuation)
+  return sgg.state.rebutChallenge(cookies, continuation,
+                                  sgg.config.MinWordLength)
 }
 
 func (sgg *SuperGhostGame) AffixWord(
