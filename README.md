@@ -6,6 +6,7 @@ Long-term goals:
 3. (Almost) always online server
 
 Medium-term goals:
+
 Server:
 - [ ] Game logic implemented & stable
 - [ ] Multiple games
@@ -13,6 +14,7 @@ Server:
 - [ ] TLS
 - [ ] At least ~50% test coverage
 - [x] Basic player tracking (via cookies)
+
 Frontend:
 - [ ] Reusable design elements (probably via css)
 - [ ] All necessary pages (list games, create a game, join a game, play)
