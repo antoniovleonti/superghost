@@ -28,12 +28,12 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
                                     "../client/style.css")
       if err != nil {
         fmt.Println(err.Error())
-        panic("panic 1")
+        panic(err.Error())
       }
       err = t.Execute(w, map[string] string {"Username": username})
       if err != nil {
         fmt.Println(err.Error())
-        panic("panic 2")
+        panic(err.Error())
       }
       return
 
@@ -52,8 +52,13 @@ func joinHandler(w http.ResponseWriter, r *http.Request) {
 
     case http.MethodGet:
       // they've already joined -- redirect them back to the game
-      t, _ := template.ParseFiles("../client/join.html")
-      t.Execute(w, struct{GameId string}{GameId: "abc123"})
+      t, err := template.ParseFiles("../client/join.html",
+                                    "../client/style.css")
+      if err != nil {
+        fmt.Println(err.Error())
+        panic(err.Error())
+      }
+      t.Execute(w, map[string] string {"GameId": "/(gameid)"})
 
     case http.MethodPost:
       r.ParseForm()
@@ -80,6 +85,7 @@ func wordHandler(w http.ResponseWriter, r *http.Request) {
       err := _sgg.AffixWord(r.Cookies(), r.FormValue("prefix"),
                            r.FormValue("suffix"))
       if err != nil {
+        fmt.Println(err.Error())
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
       }
@@ -212,10 +218,10 @@ func intermittentlyRemoveDeadPlayers() {
 
 func init() {
   _sgg = superghost.NewSuperGhostGame(superghost.GameConfig{
-    MaxPlayers: 2,
-    MinWordLength: 5,
-    IsPublic: true,
-  })
+        MaxPlayers: 3,
+        MinWordLength: 5,
+        IsPublic: true,
+      })
   _listeners = make([]chan string, 0)
   go intermittentlyRemoveDeadPlayers()
 }

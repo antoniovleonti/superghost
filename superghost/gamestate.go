@@ -37,15 +37,17 @@ type GameState struct {
   nextPlayer int
   lastPlayer string
   firstPlayer int
+  lastRoundResult string
 }
 
 type JGameState struct { // publicly visible version of gamestate
-  Players []*Player  `json:"players"`
-  Word string       `json:"word"`
-  Mode string   `json:"phase"`
-  NextPlayer int   `json:"nextPlayer"`
-  LastPlayer string `json:"lastPlayer"`
-  FirstPlayer int  `json:"firstPlayer"`
+  Players []*Player       `json:"players"`
+  Word string             `json:"word"`
+  Mode string             `json:"mode"`
+  NextPlayer int          `json:"nextPlayer"`
+  LastPlayer string       `json:"lastPlayer"`
+  FirstPlayer int         `json:"firstPlayer"`
+  LastRoundResult string  `json:"lastRoundResult"`
 }
 
 func (gs *GameState) MarshalJSON() ([]byte, error) {
@@ -59,6 +61,7 @@ func (gs *GameState) MarshalJSON() ([]byte, error) {
     NextPlayer: gs.nextPlayer,
     LastPlayer: gs.lastPlayer,
     FirstPlayer: gs.firstPlayer,
+    LastRoundResult: gs.lastRoundResult,
   })
 }
 
@@ -105,7 +108,7 @@ func (gs *GameState) addPlayer(
   }
   if len(gs.players) < 2 {
     gs.mode = kInsufficientPlayers
-    gs.newRound()
+    gs.newRound("")
   }
   return p.cookie, nil
 }
@@ -129,14 +132,25 @@ func (gs *GameState) challengeIsWord(
   if err != nil {
     return err
   }
+  var loser string
+  var correctness string
   if isWord {
+    correctness = "correctly"
+    loser = gs.lastPlayer
     if p, ok := gs.usernameToPlayer[gs.lastPlayer]; ok {
       p.score++
     }
   } else {
-    gs.players[gs.nextPlayer % len(gs.players)].score++
+    correctness = "incorrectly"
+    p := gs.players[gs.nextPlayer]
+    p.score++
+    loser = p.username
   }
-  gs.newRound()
+  lastRoundResult := fmt.Sprintf(
+      "%s %s claimed %s spelled a word with '%s'; +1 %s",
+      gs.players[gs.nextPlayer].username, correctness,
+      gs.lastPlayer, gs.word, loser)
+  gs.newRound(lastRoundResult)
   return nil
 }
 
@@ -151,6 +165,9 @@ func (gs *GameState) challengeContinuation(cookies []*http.Cookie) error {
   if gs.mode != kEdit {
     return fmt.Errorf("cannot challenge in %s mode", gs.mode.String())
   }
+  if len(gs.word) < 1 {
+    return fmt.Errorf("cannot challenge empty stem")
+  }
 
   tmpNextPlayer := gs.nextPlayer
   foundLastPlayer := false
@@ -162,7 +179,10 @@ func (gs *GameState) challengeContinuation(cookies []*http.Cookie) error {
     }
   }
   if !foundLastPlayer {
-    gs.newRound()
+    lastRoundResult := fmt.Sprintf(
+        "%s challenged %s, who has left the game",
+        gs.lastPlayer, gs.players[gs.nextPlayer].username)
+    gs.newRound(lastRoundResult)
   }
 
   gs.lastPlayer = gs.players[tmpNextPlayer % len(gs.players)].username
@@ -189,15 +209,26 @@ func (gs *GameState) rebutChallenge(
     return err
   }
   // update game state accordingly
+  var loser string
+  var success string
   if isWord && strings.Contains(continuation, gs.word) {
     // challenger gets a letter
+    success = "successfully"
+    loser = gs.lastPlayer
     if p, ok := gs.usernameToPlayer[gs.lastPlayer]; ok {
       p.score++
     }
   } else {
-    gs.players[gs.nextPlayer % len(gs.players)].score++
+    success = "unsuccessfully"
+    p := gs.players[gs.nextPlayer]
+    p.score++
+    loser = p.username
   }
-  gs.newRound()
+  lastRoundResult := fmt.Sprintf(
+      "%s %s rebutted %s's challenge with '%s'; +1 %s",
+      gs.players[gs.nextPlayer].username, success,
+      gs.lastPlayer, continuation, loser)
+  gs.newRound(lastRoundResult)
   return nil
 }
 
@@ -222,8 +253,9 @@ func (gs *GameState) affixWord(
 
   gs.word = prefix + gs.word + suffix
   gs.lastPlayer = gs.players[gs.nextPlayer].username
+  gs.lastRoundResult = ""
   if len(gs.players) == 0 {
-    gs.nextPlayer = 0 // Probably shouldn't be possible but just to be safe
+    gs.nextPlayer = 0  // Seems extremely unlikely but I'd rather be safe
   } else {
     gs.nextPlayer = (gs.nextPlayer + 1) % len(gs.players)
   }
@@ -275,7 +307,7 @@ func (gs *GameState) isInTurnCookie(cookie *http.Cookie) bool {
 }
 
 
-func (gs *GameState) newRound() {
+func (gs *GameState) newRound(lastRoundResult string) {
   gs.word = ""
   if len(gs.players) == 0 {
     gs.firstPlayer = 0
@@ -284,6 +316,7 @@ func (gs *GameState) newRound() {
   }
   gs.lastPlayer = ""
   gs.nextPlayer = gs.firstPlayer
+  gs.lastRoundResult = lastRoundResult
   if len(gs.players) >= 2 {
     gs.mode = kEdit
   } else {
@@ -304,7 +337,7 @@ func (gs *GameState) removeDeadPlayers(duration time.Duration) bool {
     }
   }
   if didRemovePlayer && (len(gs.players) < 2) {
-    gs.newRound()
+    gs.newRound("")
   }
   return didRemovePlayer
 }

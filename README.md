@@ -1,8 +1,24 @@
-# superghost-workspace
+# superghost web app
 
-todo:
-* multiple games (& index page that lists them)
-* delete games when no players are in them (after some time, i.e. 1 minute)
-* player clocks
-* fancy UI
-* DBs?? (necessary? unnecessary?)
+Long-term goals:
+1. Decoupled, modular frontend & backend
+2. Beautiful & simple frontend
+3. (Almost) always online server
+
+Medium-term goals:
+Server:
+- [ ] Game logic implemented & stable
+- [ ] Multiple games
+- [ ] Reclaiming resources (kicking idle players, ending empty games)
+- [ ] TLS
+- [ ] At least ~50% test coverage
+- [x] Basic player tracking (via cookies)
+Frontend:
+- [ ] Reusable design elements (probably via css)
+- [ ] All necessary pages (list games, create a game, join a game, play)
+
+Short-term goals:
+- [ ] Implement ‘give up’ button under rebuttal menu
+- [ ] ‘Concede round’ button under affixation menu
+- [ ] ‘Leave game’ button
+

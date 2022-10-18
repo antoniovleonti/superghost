@@ -1,5 +1,11 @@
 <html>
 
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+{{template "style" .}}
+</style>
+
 <head>
 <title>Join game</title>
 </head>
@@ -7,12 +13,18 @@
 <body>
 
 <header>
-<h1>superghost</h1>
+
+<h1>
+<span class="logoThin">super</span><span class="logoThick">g.host</span>
+</h1>
+
 </header>
 
 <h2>Join {{.GameId}}</h2>
 <form method="POST" action="/join">
-  Enter a username: <input type="text" name="username">
+  Enter a username:
+  <br><input type="text" name="username" maxlength=16 pattern="[a-zA-Z0-9]+"
+      autocapitalize=none autocorrect=false>
   <input type="submit" value="join">
 </form>
 

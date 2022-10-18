@@ -3,11 +3,19 @@
 const kMyUsername = "{{.Username}}"
 
 const affixForm = document.getElementById("affixForm")
+const suffixText = document.getElementById("suffixText")
+const prefixText = document.getElementById("prefixText")
+const affixButton = document.getElementById("affixButton")
+
 const rebutForm = document.getElementById("rebutForm")
 
 const affixFieldSet = document.getElementById("affixFieldSet")
 const challengeFieldSet = document.getElementById("challengeFieldSet")
 const rebutFieldSet = document.getElementById("rebutFieldSet")
+
+const wordSpan = document.getElementById("wordSpan")
+const statusSpan = document.getElementById("statusSpan")
+const lastRoundResultSpan = document.getElementById("lastRoundResultSpan")
 
 affixForm.addEventListener("submit", function(e){
   e.preventDefault() // do not redirect
@@ -96,12 +104,41 @@ function getCurrentGameState () {
   xhr.send()
 }
 
+function renderStatus(mode, lastPlayerUsername, nextPlayerUsername) {
+  let n, l
+  switch (mode) {
+    case "edit":
+      n = nextPlayerUsername == kMyUsername ? "your" : nextPlayerUsername + "'s"
+      statusSpan.innerHTML = "It is " + n + " turn."
+      break
+    case "rebut":
+      n = nextPlayerUsername == kMyUsername ? "you" : nextPlayerUsername
+      l = lastPlayerUsername == kMyUsername ? "You" : lastPlayerUsername
+      statusSpan.innerHTML = l + " challenged " + n + "."
+      break
+    case "insufficient players":
+      statusSpan.innerHTML = "Waiting for players."
+      break
+    default:
+      break
+  }
+}
+
+function renderLastRoundResult(lastRoundResult) {
+  lastRoundResultSpan.innerHTML = lastRoundResult
+}
+
 // TODO: clean this up
 function renderEverything(gameState) {
   renderPlayers(gameState.players, gameState.nextPlayer)
-  renderWord(gameState.word)
+  renderWord(gameState.mode, gameState.word,
+             gameState.players[gameState.nextPlayer].username)
+  renderStatus(gameState.mode, gameState.lastPlayer,
+               gameState.players[gameState.nextPlayer].username)
+  renderLastRoundResult(gameState.lastRoundResult)
+
   if (gameState.players[gameState.nextPlayer].username == kMyUsername) {
-    switch (gameState.phase) {
+    switch (gameState.mode) {
       case "edit":
         enterEditMode()
         break;
@@ -122,6 +159,7 @@ function renderPlayers(players, nextPlayer) {
   playerList.innerHTML = "" // clear
   for (let i = 0; i < players.length; i++) {
     var node = document.createElement("li")
+    node.classList.add("playerListItem")
     var playerStr = players[i].username + " " + players[i].score
 
     node.appendChild(document.createTextNode(playerStr))
@@ -156,8 +194,28 @@ function enterRebuttalMode() {
   challengeForm.style.display="none"
 }
 
-function renderWord(word) {
-  document.getElementById("word").innerHTML = word
+function renderWord(mode, word, nextPlayerUsername) {
+  wordSpan.innerHTML = word
+  switch (mode) {
+    case "edit":
+      if (nextPlayerUsername != kMyUsername) {
+        prefixText.style.visibility = "hidden"
+        suffixText.style.visibility = "hidden"
+        suffixText.style.display = "inline"
+        affixButton.style.visibility = "hidden"
+      } else {
+        prefixText.style.visibility = "visible"
+        suffixText.style.visibility = "visible"
+        suffixText.style.display = word.length > 0 ? "inline" : "none"
+        affixButton.style.visibility = "visible"
+      }
+      break
+    default:
+      prefixText.style.visibility = "hidden"
+      suffixText.style.visibility = "hidden"
+      suffixText.style.display = "inline"
+      affixButton.style.visibility = "hidden"
+  }
 }
 
 getCurrentGameState()

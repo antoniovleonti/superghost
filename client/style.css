@@ -1,38 +1,42 @@
 {{define "style"}}
 
+* {
+  font-family: 'Nunito', sans-serif;
+}
+
+#wordSpan, #prefixText, #suffixText {
+  font-family: 'Georgia', serif;
+  font-size: 24;
+}
+
 fieldset {
   border: none;
 }
 
-* {
-  font-family: 'inter', sans-serif;
-}
-
 .wrapper {
   display: grid;
-  grid-template-columns: repeat(3, auto);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: auto;
-  border: none;
   height: 80vh;
+  border: none;
 }
 
 .players {
-  display: block;
   grid-column: 1;
-  grid-row: 1/-1;
-  border: none;
+  text-align: right;
   padding: 20px;
+  border: none;
 }
 
 .forms {
   padding: 20px;
-  grid-column: 1/-1;
+  grid-column: 2;
   grid-row: 1/-1;
-  border: none;
   text-align: center;
+  border: 1px solid;
 }
 
-input, button, li {
+input, button, .playerListItem {
   margin: 5px;
   border: 1px solid;
   padding: 5px;
@@ -41,10 +45,11 @@ input, button, li {
   box-shadow: 2px 2px;
 }
 
-ul {
+#playerList {
   padding: 0px;
+  direction: rtl;
 }
-li {
+.playerListItem {
   list-style: none;
   list-style-position: inside;
   border-radius: 100px;
@@ -54,25 +59,27 @@ li {
   margin-left: 0px;
 }
 input[type=text] {
-  border-radius:0px;
+  border-radius: 0px;
   box-shadow: 0px 0px;
+  border: none;
+  border-bottom: 1px dotted;
 }
 
-#prefixText, #suffixText{
-  margin: 0px
+#prefixText, #suffixText, #wordSpan {
+  margin-left: 0px;
+  margin-right: 0px;
+  padding-left: 0px;
+  padding-right: 0px;
 }
-.super{
+.logoThin{
   font-weight: 200;
 }
 
 @media (max-width: 768px) {
   .wrapper {
-    grid-template-columns: auto;
-    grid-template-rows: auto auto;
+    display: block;
   }
   .players {
-    grid-column: 1/-1;
-    grid-row: 2;
   }
 
   .forms {
