@@ -8,7 +8,7 @@ const prefixText = document.getElementById("prefixText")
 const affixButton = document.getElementById("affixButton")
 
 const rebutForm = document.getElementById("rebutForm")
-const giveUpButton = document.getElementById("giveUpButton")
+const concedeButton = document.getElementById("concedeButton")
 
 
 const affixFieldSet = document.getElementById("affixFieldSet")
@@ -48,7 +48,7 @@ rebutForm.addEventListener("submit", function(e){
   xhr.send(new URLSearchParams(new FormData(rebutForm)))
 })
 
-giveUpButton.addEventListener("click", function(e){
+concedeButton.addEventListener("click", function(e){
   e.preventDefault() // do not redirect
   var xhr = new XMLHttpRequest()
 	xhr.onload = function() {
@@ -58,11 +58,8 @@ giveUpButton.addEventListener("click", function(e){
 		}
 		rebutForm.reset()
 	}
-  xhr.open("POST", "/rebuttal")
-  params = new URLSearchParams(new FormData(rebutForm))
-  params.giveUp = true
-  console.log(params)
-  xhr.send(params)
+  xhr.open("POST", "/concession")
+  xhr.send()
 })
 
 isWordButton.addEventListener("click", function(e){
