@@ -2,17 +2,18 @@ package main
 
 import (
   "fmt"
-  "text/template"
   "log"
   "net/http"
+  "strconv"
   "superghost"
   "sync"
+  "text/template"
   "time"
 )
 
 var _listeners []chan string
 var _listenersMutex sync.RWMutex
-var _sgg *superghost.SuperGhostGame
+var _sgg *superghost.Room
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
@@ -25,7 +26,8 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
       }
       t, err := template.ParseFiles("../client/play.html",
                                     "../client/script.js",
-                                    "../client/style.css")
+                                    "../client/style.css",
+                                    "../client/sharedHtml.tmpl")
       if err != nil {
         fmt.Println(err.Error())
         panic(err.Error())
@@ -37,7 +39,6 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
       }
       return
 
-
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
   }
@@ -45,15 +46,16 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 
 func joinHandler(w http.ResponseWriter, r *http.Request) {
   if _, ok := _sgg.GetValidCookie(r.Cookies()); ok {
+    // they've already joined -- redirect them back to the game
     http.Redirect(w, r, "/", http.StatusFound)
     return
   }
   switch r.Method {
 
     case http.MethodGet:
-      // they've already joined -- redirect them back to the game
       t, err := template.ParseFiles("../client/join.html",
-                                    "../client/style.css")
+                                    "../client/style.css",
+                                    "../client/sharedHtml.tmpl")
       if err != nil {
         fmt.Println(err.Error())
         panic(err.Error())
@@ -83,9 +85,8 @@ func wordHandler(w http.ResponseWriter, r *http.Request) {
     case http.MethodPost:
       r.ParseForm()
       err := _sgg.AffixWord(r.Cookies(), r.FormValue("prefix"),
-                           r.FormValue("suffix"))
+                            r.FormValue("suffix"))
       if err != nil {
-        fmt.Println(err.Error())
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
       }
@@ -132,7 +133,12 @@ func rebuttalHandler(w http.ResponseWriter, r *http.Request) {
     case http.MethodPost:
       // it must be your turn to challenge.
       r.ParseForm()
-      err := _sgg.RebutChallenge(r.Cookies(), r.FormValue("continuation"))
+      giveUp, err := strconv.ParseBool(r.FormValue("giveUp"))
+      if err != nil {
+        giveUp = false
+      }
+      err = _sgg.RebutChallenge(r.Cookies(), r.FormValue("continuation"),
+                                 giveUp)
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
@@ -190,16 +196,31 @@ func heartbeatHandler(w http.ResponseWriter, r *http.Request) {
   }
 }
 
+func concedeHandler(w http.ResponseWriter, r *http.Request) {
+  switch r.Method {
+
+    case http.MethodPost:
+      err := _sgg.Concede(r.Cookies())
+      if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+      }
+      fmt.Fprint(w, "success")
+
+    default:
+      http.Error(w, "", http.StatusMethodNotAllowed)
+  }
+}
+
 func broadcastGameState() {
   _listenersMutex.Lock()
   defer _listenersMutex.Unlock()
 
   b, err := _sgg.GetJsonGameState()
   if err != nil {
-    panic("couldn't encode superghost") // something's gone terribly wrong
+    panic("couldn't get json game state") // something's gone terribly wrong
   }
   s := string(b)
-  fmt.Println("s = " + s) // print all updates to game state to the console!
+  fmt.Println(s) // print all updates to game state to the console!
   for _, c := range _listeners {
     c <- s
   }
@@ -217,7 +238,7 @@ func intermittentlyRemoveDeadPlayers() {
 }
 
 func init() {
-  _sgg = superghost.NewSuperGhostGame(superghost.GameConfig{
+  _sgg = superghost.NewRoom(superghost.Config{
         MaxPlayers: 3,
         MinWordLength: 5,
         IsPublic: true,
@@ -236,6 +257,7 @@ func main() {
   http.HandleFunc("/challenge-continuation", challengeContinuationHandler)
   http.HandleFunc("/rebuttal", rebuttalHandler)
   http.HandleFunc("/heartbeat", heartbeatHandler)
+  http.HandleFunc("/concede", concedeHandler)
 
   err := http.ListenAndServe(":9090", nil) // setting listening port
   if err != nil {

@@ -9,55 +9,55 @@ import (
   "time"
 )
 
-type GameMode int
+type Blocker int
 const (
-  kEdit GameMode = iota
+  kEdit Blocker = iota
   kRebut
-  kInsufficientPlayers
+  kPlayers
 )
-func (p GameMode) String() string {
+func (p Blocker) String() string {
   switch p {
     case kEdit:
       return "edit"
     case kRebut:
       return "rebut"
-    case kInsufficientPlayers:
+    case kPlayers:
       return "insufficient players"
     default:
-      panic("invalid GameMode value")
+      panic("invalid Blocker value")
   }
 }
 
-type GameState struct {
+type state struct {
   mutex sync.RWMutex
   players []*Player
   usernameToPlayer map[string]*Player
   word string
-  mode GameMode
+  awaiting Blocker
   nextPlayer int
   lastPlayer string
   firstPlayer int
   lastRoundResult string
 }
 
-type JGameState struct { // publicly visible version of gamestate
+type jState struct { // publicly visible version of gamestate
   Players []*Player       `json:"players"`
   Word string             `json:"word"`
-  Mode string             `json:"mode"`
+  Awaiting string         `json:"awaiting"`
   NextPlayer int          `json:"nextPlayer"`
   LastPlayer string       `json:"lastPlayer"`
   FirstPlayer int         `json:"firstPlayer"`
   LastRoundResult string  `json:"lastRoundResult"`
 }
 
-func (gs *GameState) MarshalJSON() ([]byte, error) {
+func (gs *state) MarshalJSON() ([]byte, error) {
   gs.mutex.RLock()
   defer gs.mutex.RUnlock()
 
-  return json.Marshal(JGameState {
+  return json.Marshal(jState {
     Players: gs.players,
     Word: gs.word,
-    Mode: gs.mode.String(),
+    Awaiting: gs.awaiting.String(),
     NextPlayer: gs.nextPlayer,
     LastPlayer: gs.lastPlayer,
     FirstPlayer: gs.firstPlayer,
@@ -65,18 +65,18 @@ func (gs *GameState) MarshalJSON() ([]byte, error) {
   })
 }
 
-func NewGameState() *GameState {
-  gs := new(GameState)
+func newState() *state {
+  gs := new(state)
   gs.players = make([]*Player, 0)
   gs.usernameToPlayer = make(map[string]*Player)
-  gs.mode = kInsufficientPlayers
+  gs.awaiting = kPlayers
   gs.nextPlayer = 0
   gs.lastPlayer = ""
   gs.firstPlayer = 0
   return gs
 }
 
-func (gs *GameState) getValidCookie(cookies []*http.Cookie) (string, bool) {
+func (gs *state) getValidCookie(cookies []*http.Cookie) (string, bool) {
   for _, cookie := range cookies {
     if gs.isValidCookie(cookie) {
       return cookie.Name, true
@@ -85,7 +85,7 @@ func (gs *GameState) getValidCookie(cookies []*http.Cookie) (string, bool) {
   return "", false
 }
 
-func (gs *GameState) addPlayer(
+func (gs *state) addPlayer(
     username string, maxPlayers int) (*http.Cookie, error) {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
@@ -103,17 +103,17 @@ func (gs *GameState) addPlayer(
   p := NewPlayer(username)
   gs.usernameToPlayer[username] = p
   gs.players = append(gs.players, p)
-  if len(gs.players) >= 2 && gs.mode == kInsufficientPlayers {
-    gs.mode = kEdit
+  if len(gs.players) >= 2 && gs.awaiting == kPlayers {
+    gs.awaiting = kEdit
   }
   if len(gs.players) < 2 {
-    gs.mode = kInsufficientPlayers
+    gs.awaiting = kPlayers
     gs.newRound("")
   }
   return p.cookie, nil
 }
 
-func (gs *GameState) challengeIsWord(
+func (gs *state) challengeIsWord(
     cookies []*http.Cookie, minLength int) error {
   if _, ok := gs.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
@@ -121,8 +121,8 @@ func (gs *GameState) challengeIsWord(
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
-  if gs.mode != kEdit {
-    return fmt.Errorf("cannot challenge in %s mode", gs.mode.String())
+  if gs.awaiting != kEdit {
+    return fmt.Errorf("cannot challenge right now", gs.awaiting.String())
   }
   if len(gs.word) < minLength {
     return fmt.Errorf("minimum word length not met")
@@ -146,15 +146,13 @@ func (gs *GameState) challengeIsWord(
     p.score++
     loser = p.username
   }
-  lastRoundResult := fmt.Sprintf(
-      "%s %s claimed %s spelled a word with '%s'; +1 %s",
-      gs.players[gs.nextPlayer].username, correctness,
-      gs.lastPlayer, gs.word, loser)
-  gs.newRound(lastRoundResult)
+  gs.newRound(fmt.Sprintf("%s %s claimed %s spelled a word with '%s'; +1 %s",
+                          gs.players[gs.nextPlayer].username, correctness,
+                          gs.lastPlayer, gs.word, loser))
   return nil
 }
 
-func (gs *GameState) challengeContinuation(cookies []*http.Cookie) error {
+func (gs *state) challengeContinuation(cookies []*http.Cookie) error {
   if _, ok := gs.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
   }
@@ -162,8 +160,8 @@ func (gs *GameState) challengeContinuation(cookies []*http.Cookie) error {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
-  if gs.mode != kEdit {
-    return fmt.Errorf("cannot challenge in %s mode", gs.mode.String())
+  if gs.awaiting != kEdit {
+    return fmt.Errorf("cannot challenge right now", gs.awaiting.String())
   }
   if len(gs.word) < 1 {
     return fmt.Errorf("cannot challenge empty stem")
@@ -186,18 +184,27 @@ func (gs *GameState) challengeContinuation(cookies []*http.Cookie) error {
   }
 
   gs.lastPlayer = gs.players[tmpNextPlayer % len(gs.players)].username
-  gs.mode = kRebut
+  gs.awaiting = kRebut
   return nil
 }
 
-func (gs *GameState) rebutChallenge(
-    cookies []*http.Cookie, continuation string, minLength int) error {
-  if gs.mode != kRebut {
-    return fmt.Errorf("cannot rebut in %s mode", gs.mode.String())
+func (gs *state) rebutChallenge(cookies []*http.Cookie, continuation string,
+                                giveUp bool, minLength int) error {
+  if gs.awaiting != kRebut {
+    return fmt.Errorf("cannot rebut right now")
   }
   if _, ok := gs.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
   }
+  if giveUp {
+    p := gs.players[gs.nextPlayer]
+    p.score++
+    loser := p.username
+    winner := gs.lastPlayer
+    gs.newRound(fmt.Sprintf("%s conceded to %s's challenge of '%s'; +1 %s",
+                            loser, winner, gs.word, loser))
+  }
+
   if len(continuation) < minLength {
     return fmt.Errorf("minimum word length not met")
   }
@@ -224,20 +231,18 @@ func (gs *GameState) rebutChallenge(
     p.score++
     loser = p.username
   }
-  lastRoundResult := fmt.Sprintf(
-      "%s %s rebutted %s's challenge with '%s'; +1 %s",
-      gs.players[gs.nextPlayer].username, success,
-      gs.lastPlayer, continuation, loser)
-  gs.newRound(lastRoundResult)
+  gs.newRound(fmt.Sprintf("%s %s rebutted %s's challenge with '%s'; +1 %s",
+                          gs.players[gs.nextPlayer].username, success,
+                          gs.lastPlayer, continuation, loser))
   return nil
 }
 
-func (gs *GameState) affixWord(
+func (gs *state) affixWord(
     cookies []*http.Cookie, prefix string, suffix string) error {
   gs.mutex.RLock()
-  if gs.mode != kEdit {
+  if gs.awaiting != kEdit {
     gs.mutex.RUnlock()
-    return fmt.Errorf("cannot edit word in %s mode", gs.mode.String())
+    return fmt.Errorf("cannot affix right now", gs.awaiting.String())
   }
   gs.mutex.RUnlock()
   if _, ok := gs.getInTurnCookie(cookies); !ok {
@@ -262,23 +267,7 @@ func (gs *GameState) affixWord(
   return nil
 }
 
-func (gs *GameState) heartbeat(cookies []*http.Cookie) error {
-  username, ok := gs.getValidCookie(cookies) // needs mutex
-  if !ok {
-    return fmt.Errorf("no credentials provided")
-  }
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
-
-  p, ok := gs.usernameToPlayer[username]
-  if !ok {
-    return fmt.Errorf("player does not exist")
-  }
-  p.heartbeat()
-  return nil
-}
-
-func (gs *GameState) isValidCookie(cookie *http.Cookie) bool {
+func (gs *state) isValidCookie(cookie *http.Cookie) bool {
   gs.mutex.RLock()
   defer gs.mutex.RUnlock()
 
@@ -288,7 +277,7 @@ func (gs *GameState) isValidCookie(cookie *http.Cookie) bool {
   return gs.usernameToPlayer[cookie.Name].cookie.Value == cookie.Value
 }
 
-func (gs *GameState) getInTurnCookie(cookies []*http.Cookie) (
+func (gs *state) getInTurnCookie(cookies []*http.Cookie) (
     *http.Cookie, bool) {
   for _, cookie := range cookies {
     if gs.isInTurnCookie(cookie) {
@@ -298,7 +287,7 @@ func (gs *GameState) getInTurnCookie(cookies []*http.Cookie) (
   return nil, false
 }
 
-func (gs *GameState) isInTurnCookie(cookie *http.Cookie) bool {
+func (gs *state) isInTurnCookie(cookie *http.Cookie) bool {
   gs.mutex.RLock()
   defer gs.mutex.RUnlock()
 
@@ -307,7 +296,7 @@ func (gs *GameState) isInTurnCookie(cookie *http.Cookie) bool {
 }
 
 
-func (gs *GameState) newRound(lastRoundResult string) {
+func (gs *state) newRound(lastRoundResult string) {
   gs.word = ""
   if len(gs.players) == 0 {
     gs.firstPlayer = 0
@@ -318,14 +307,14 @@ func (gs *GameState) newRound(lastRoundResult string) {
   gs.nextPlayer = gs.firstPlayer
   gs.lastRoundResult = lastRoundResult
   if len(gs.players) >= 2 {
-    gs.mode = kEdit
+    gs.awaiting = kEdit
   } else {
-    gs.mode = kInsufficientPlayers
+    gs.awaiting = kPlayers
   }
 }
 
 // returns true if any players are removed, false otherwise
-func (gs *GameState) removeDeadPlayers(duration time.Duration) bool {
+func (gs *state) removeDeadPlayers(duration time.Duration) bool {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
@@ -342,7 +331,7 @@ func (gs *GameState) removeDeadPlayers(duration time.Duration) bool {
   return didRemovePlayer
 }
 
-func (gs *GameState) removePlayer(index int) {
+func (gs *state) removePlayer(index int) {
   if index < gs.nextPlayer {
     gs.nextPlayer--
   }
@@ -359,7 +348,7 @@ func (gs *GameState) removePlayer(index int) {
   }
 }
 
-func (gs *GameState) Heartbeat(cookies []*http.Cookie) error {
+func (gs *state) heartbeat(cookies []*http.Cookie) error {
   username, ok := gs.getValidCookie(cookies) // needs mutex
   if !ok {
     return fmt.Errorf("no credentials provided")
@@ -375,3 +364,40 @@ func (gs *GameState) Heartbeat(cookies []*http.Cookie) error {
   return nil
 }
 
+func (gs *state) concede(cookies []*http.Cookie) error {
+  username, ok := gs.getValidCookie(cookies)
+  if !ok {
+    return fmt.Errorf("no credentials provided")
+  }
+  gs.mutex.Lock()
+  defer gs.mutex.Unlock()
+  switch gs.awaiting {
+
+    case kPlayers:
+      return fmt.Errorf("cannot concede right now")
+
+    case kEdit:
+      if len(gs.word) == 0 {
+        return fmt.Errorf("cannot concede when word is empty")
+      }
+      gs.usernameToPlayer[username].score++
+      gs.newRound(fmt.Sprintf("%s conceded the round at '%s'; +1 %s"))
+
+    case kRebut:
+      if (username != gs.lastPlayer &&
+          username != gs.players[gs.nextPlayer].username) {
+        return fmt.Errorf("it is not your turn")
+      }
+      gs.usernameToPlayer[username].score++
+      if username == gs.lastPlayer {
+        gs.newRound(fmt.Sprintf(
+            "%s conceded the round after challenging %s at '%s'; +1 %s",
+            username, gs.players[gs.nextPlayer].username, gs.word, username))
+        return nil
+      } // else
+      gs.newRound(fmt.Sprintf(
+          "%s conceded the round after being challenged by %s at '%s'; +1 %s",
+          username, gs.lastPlayer, gs.word, username))
+  }
+  return nil
+}
