@@ -8,6 +8,8 @@ const prefixText = document.getElementById("prefixText")
 const affixButton = document.getElementById("affixButton")
 
 const rebutForm = document.getElementById("rebutForm")
+const giveUpButton = document.getElementById("giveUpButton")
+
 
 const affixFieldSet = document.getElementById("affixFieldSet")
 const challengeFieldSet = document.getElementById("challengeFieldSet")
@@ -16,6 +18,7 @@ const rebutFieldSet = document.getElementById("rebutFieldSet")
 const wordSpan = document.getElementById("wordSpan")
 const statusSpan = document.getElementById("statusSpan")
 const lastRoundResultSpan = document.getElementById("lastRoundResultSpan")
+
 
 affixForm.addEventListener("submit", function(e){
   e.preventDefault() // do not redirect
@@ -43,6 +46,23 @@ rebutForm.addEventListener("submit", function(e){
 	}
   xhr.open("POST", "/rebuttal")
   xhr.send(new URLSearchParams(new FormData(rebutForm)))
+})
+
+giveUpButton.addEventListener("click", function(e){
+  e.preventDefault() // do not redirect
+  var xhr = new XMLHttpRequest()
+	xhr.onload = function() {
+		if (xhr.status != 200) {
+			console.log(xhr.responseText)
+			return // I should probably do something useful here
+		}
+		rebutForm.reset()
+	}
+  xhr.open("POST", "/rebuttal")
+  params = new URLSearchParams(new FormData(rebutForm))
+  params.giveUp = true
+  console.log(params)
+  xhr.send(params)
 })
 
 isWordButton.addEventListener("click", function(e){
@@ -131,14 +151,14 @@ function renderLastRoundResult(lastRoundResult) {
 // TODO: clean this up
 function renderEverything(gameState) {
   renderPlayers(gameState.players, gameState.nextPlayer)
-  renderWord(gameState.mode, gameState.word,
+  renderWord(gameState.awaiting, gameState.word,
              gameState.players[gameState.nextPlayer].username)
-  renderStatus(gameState.mode, gameState.lastPlayer,
+  renderStatus(gameState.awaiting, gameState.lastPlayer,
                gameState.players[gameState.nextPlayer].username)
   renderLastRoundResult(gameState.lastRoundResult)
 
   if (gameState.players[gameState.nextPlayer].username == kMyUsername) {
-    switch (gameState.mode) {
+    switch (gameState.awaiting) {
       case "edit":
         enterEditMode()
         break;
@@ -220,5 +240,4 @@ function renderWord(mode, word, nextPlayerUsername) {
 
 getCurrentGameState()
 longPollNextGameState()
-
 {{end}}

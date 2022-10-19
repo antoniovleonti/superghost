@@ -1,5 +1,7 @@
 <html>
 
+{{template "sharedHtmlLinks" .}}
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -12,13 +14,7 @@
 
 <body>
 
-<header>
-
-<h1>
-<span class="logoThin">super</span><span class="logoThick">g.host</span>
-</h1>
-
-</header>
+{{template "sharedHtmlHeader" .}}
 
 <h2>Join {{.GameId}}</h2>
 <form method="POST" action="/join">
