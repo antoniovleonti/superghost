@@ -20,7 +20,6 @@ Frontend:
 - [ ] All necessary pages (list games, create a game, join a game, play)
 
 Short-term goals:
-- [ ] Implement ‘give up’ button under rebuttal menu
-- [ ] ‘Concede round’ button under affixation menu
+- [ ] Add general 'concede' button to client
 - [ ] ‘Leave game’ button
 
