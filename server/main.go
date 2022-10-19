@@ -196,7 +196,7 @@ func heartbeatHandler(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-func concedeHandler(w http.ResponseWriter, r *http.Request) {
+func concessionHandler(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
 
     case http.MethodPost:
@@ -205,6 +205,7 @@ func concedeHandler(w http.ResponseWriter, r *http.Request) {
         http.Error(w, err.Error(), http.StatusBadRequest)
       }
       fmt.Fprint(w, "success")
+      broadcastGameState()
 
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
@@ -257,7 +258,7 @@ func main() {
   http.HandleFunc("/challenge-continuation", challengeContinuationHandler)
   http.HandleFunc("/rebuttal", rebuttalHandler)
   http.HandleFunc("/heartbeat", heartbeatHandler)
-  http.HandleFunc("/concede", concedeHandler)
+  http.HandleFunc("/concession", concessionHandler)
 
   err := http.ListenAndServe(":9090", nil) // setting listening port
   if err != nil {
