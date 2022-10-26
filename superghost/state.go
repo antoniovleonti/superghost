@@ -268,9 +268,6 @@ func (gs *state) affixWord(
 }
 
 func (gs *state) isValidCookie(cookie *http.Cookie) bool {
-  gs.mutex.RLock()
-  defer gs.mutex.RUnlock()
-
   if _, ok := gs.usernameToPlayer[cookie.Name]; !ok {
     return false
   }
@@ -331,7 +328,10 @@ func (gs *state) removeDeadPlayers(duration time.Duration) bool {
   return didRemovePlayer
 }
 
-func (gs *state) removePlayer(index int) {
+func (gs *state) removePlayer(index int) error {
+  if index > len(gs.players) {
+    return fmt.Errorf("index out of bounds")
+  }
   if index < gs.nextPlayer {
     gs.nextPlayer--
   }
@@ -346,15 +346,32 @@ func (gs *state) removePlayer(index int) {
   } else {
     gs.players = append(gs.players[:index], gs.players[index+1:]...)
   }
+  return nil
+}
+
+func (gs *state) leave(cookies []*http.Cookie) error {
+  gs.mutex.Lock()
+  defer gs.mutex.Unlock()
+  username, ok := gs.getValidCookie(cookies)
+  if !ok {
+    return fmt.Errorf("no credentials provided")
+  }
+
+  for i, p := range gs.players { // we have to find the index of the player
+    if p.username == username {
+      return gs.removePlayer(i)
+    }
+  }
+  return fmt.Errorf("unexpected error: player not found")
 }
 
 func (gs *state) heartbeat(cookies []*http.Cookie) error {
+  gs.mutex.Lock()
+  defer gs.mutex.Unlock()
   username, ok := gs.getValidCookie(cookies) // needs mutex
   if !ok {
     return fmt.Errorf("no credentials provided")
   }
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
 
   p, ok := gs.usernameToPlayer[username]
   if !ok {
@@ -365,12 +382,12 @@ func (gs *state) heartbeat(cookies []*http.Cookie) error {
 }
 
 func (gs *state) concede(cookies []*http.Cookie) error {
+  gs.mutex.Lock()
+  defer gs.mutex.Unlock()
   username, ok := gs.getValidCookie(cookies)
   if !ok {
     return fmt.Errorf("no credentials provided")
   }
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
   switch gs.awaiting {
 
     case kPlayers:
@@ -381,7 +398,8 @@ func (gs *state) concede(cookies []*http.Cookie) error {
         return fmt.Errorf("cannot concede when word is empty")
       }
       gs.usernameToPlayer[username].score++
-      gs.newRound(fmt.Sprintf("%s conceded the round at '%s'; +1 %s"))
+      gs.newRound(fmt.Sprintf("%s conceded the round at '%s'; +1 %s",
+                              username, gs.word, username))
 
     case kRebut:
       if (username != gs.lastPlayer &&

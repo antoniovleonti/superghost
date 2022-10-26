@@ -3,15 +3,11 @@
 const kMyUsername = "{{.Username}}"
 
 const affixForm = document.getElementById("affixForm")
-const suffixText = document.getElementById("suffixText")
-const prefixText = document.getElementById("prefixText")
-const affixButton = document.getElementById("affixButton")
+const affixFieldSet = document.getElementById("affixFieldSet")
 
 const rebutForm = document.getElementById("rebutForm")
 const concedeButton = document.getElementById("concedeButton")
 
-
-const affixFieldSet = document.getElementById("affixFieldSet")
 const challengeFieldSet = document.getElementById("challengeFieldSet")
 const rebutFieldSet = document.getElementById("rebutFieldSet")
 
@@ -19,6 +15,16 @@ const wordSpan = document.getElementById("wordSpan")
 const statusSpan = document.getElementById("statusSpan")
 const lastRoundResultSpan = document.getElementById("lastRoundResultSpan")
 
+const playerList = document.getElementById("playerList")
+
+let leaveButton = document.createElement("button");
+leaveButton.innerHTML = "leave"
+
+leaveButton.addEventListener("click", function(e){
+  var xhr = new XMLHttpRequest()
+  xhr.open("POST", "/leave")
+  xhr.send()
+})
 
 affixForm.addEventListener("submit", function(e){
   e.preventDefault() // do not redirect
@@ -56,7 +62,6 @@ concedeButton.addEventListener("click", function(e){
 			console.log(xhr.responseText)
 			return // I should probably do something useful here
 		}
-		rebutForm.reset()
 	}
   xhr.open("POST", "/concession")
   xhr.send()
@@ -129,8 +134,8 @@ function renderStatus(mode, lastPlayerUsername, nextPlayerUsername) {
       statusSpan.innerHTML = "It is " + n + " turn."
       break
     case "rebut":
-      n = nextPlayerUsername == kMyUsername ? "you" : nextPlayerUsername
       l = lastPlayerUsername == kMyUsername ? "You" : lastPlayerUsername
+      n = nextPlayerUsername == kMyUsername ? "you" : nextPlayerUsername
       statusSpan.innerHTML = l + " challenged " + n + "."
       break
     case "insufficient players":
@@ -146,95 +151,40 @@ function renderLastRoundResult(lastRoundResult) {
 }
 
 // TODO: clean this up
-function renderEverything(gameState) {
-  renderPlayers(gameState.players, gameState.nextPlayer)
-  renderWord(gameState.awaiting, gameState.word,
-             gameState.players[gameState.nextPlayer].username)
-  renderStatus(gameState.awaiting, gameState.lastPlayer,
-               gameState.players[gameState.nextPlayer].username)
-  renderLastRoundResult(gameState.lastRoundResult)
-
-  if (gameState.players[gameState.nextPlayer].username == kMyUsername) {
-    switch (gameState.awaiting) {
-      case "edit":
-        enterEditMode()
-        break;
-      case "rebut":
-        enterRebuttalMode()
-        break
-      case "insufficient players":
-        enterReadonlyMode()
-        break
-    }
-  } else {
-    enterReadonlyMode()
-  }
+function renderEverything(gs) {
+  renderPlayers(gs.players, gs.nextPlayer)
+  renderForms(gs.awaiting, gs.word, gs.players[gs.nextPlayer].username)
+  renderStatus(gs.awaiting, gs.lastPlayer, gs.players[gs.nextPlayer].username)
+  renderLastRoundResult(gs.lastRoundResult)
 }
 
 function renderPlayers(players, nextPlayer) {
-  playerList = document.getElementById("playerList")
   playerList.innerHTML = "" // clear
-  for (let i = 0; i < players.length; i++) {
-    var node = document.createElement("li")
-    node.classList.add("playerListItem")
-    var playerStr = players[i].username + " " + players[i].score
+  for (const p of players) {
+    let isMe = p.username == kMyUsername
+    let li = document.createElement("li")
+    li.classList.add("playerli")
 
-    node.appendChild(document.createTextNode(playerStr))
-    playerList.appendChild(node)
+    let pstr = p.username + " " + p.score
+    li.appendChild(document.createTextNode(pstr))
+
+    if (isMe) {
+      li.appendChild(leaveButton)
+    }
+    playerList.appendChild(li)
   }
 }
 
-function enterEditMode() {
-  // enable editor
-  affixFieldSet.disabled=false
-  challengeFieldSet.disabled=false
-  rebutFieldSet.disabled=true
-
-  // change visibilities
-  rebutForm.style.display="none"
-  challengeForm.style.display="block"
-}
-
-function enterReadonlyMode() {
-  affixFieldSet.disabled=true
-  challengeFieldSet.disabled=true
-  rebutFieldSet.disabled=true
-  rebutForm.style.display="none"
-  challengeForm.style.display="none"
-}
-
-function enterRebuttalMode() {
-  affixFieldSet.disabled=true
-  challengeFieldSet.disabled=true
-  rebutFieldSet.disabled=false
-  rebutForm.style.display="block"
-  challengeForm.style.display="none"
-}
-
-function renderWord(mode, word, nextPlayerUsername) {
+function renderForms(mode, word, nextPlayerUsername) {
   wordSpan.innerHTML = word
-  switch (mode) {
-    case "edit":
-      if (nextPlayerUsername != kMyUsername) {
-        prefixText.style.visibility = "hidden"
-        suffixText.style.visibility = "hidden"
-        suffixText.style.display = "inline"
-        affixButton.style.visibility = "hidden"
-      } else {
-        prefixText.style.visibility = "visible"
-        suffixText.style.visibility = "visible"
-        suffixText.style.display = word.length > 0 ? "inline" : "none"
-        affixButton.style.visibility = "visible"
-      }
-      break
-    default:
-      prefixText.style.visibility = "hidden"
-      suffixText.style.visibility = "hidden"
-      suffixText.style.display = "inline"
-      affixButton.style.visibility = "hidden"
-  }
+
+  nextPlayerIsMe = nextPlayerUsername == kMyUsername
+  affixFieldSet.disabled = !(nextPlayerIsMe && mode == "edit")
+  challengeFieldSet.disabled = !(nextPlayerIsMe && mode == "edit")
+  rebutFieldSet.disabled = !(nextPlayerIsMe && mode == "rebut")
 }
 
 getCurrentGameState()
 longPollNextGameState()
+
 {{end}}

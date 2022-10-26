@@ -105,6 +105,7 @@ func challengeIsWordHandler(w http.ResponseWriter, r *http.Request) {
       err := _sgg.ChallengeIsWord(r.Cookies())
       if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
       }
       broadcastGameState()
 
@@ -120,6 +121,7 @@ func challengeContinuationHandler(w http.ResponseWriter, r *http.Request) {
       err := _sgg.ChallengeContinuation(r.Cookies())
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
+        return
       }
       broadcastGameState()
 
@@ -203,8 +205,26 @@ func concessionHandler(w http.ResponseWriter, r *http.Request) {
       err := _sgg.Concede(r.Cookies())
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
+        return
       }
       fmt.Fprint(w, "success")
+      broadcastGameState()
+
+    default:
+      http.Error(w, "", http.StatusMethodNotAllowed)
+  }
+}
+
+func leaveHandler(w http.ResponseWriter, r *http.Request) {
+  switch r.Method {
+
+    case http.MethodPost:
+      err := _sgg.Leave(r.Cookies())
+      if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+      }
+      http.Redirect(w, r, "/join", http.StatusFound)
       broadcastGameState()
 
     default:
@@ -231,7 +251,7 @@ func broadcastGameState() {
 func intermittentlyRemoveDeadPlayers() {
   for _ = range time.Tick(time.Second) {
     go func () {
-      if _sgg.RemoveDeadPlayers(15 * time.Second) {
+      if _sgg.RemoveDeadPlayers(10 * time.Minute) {
         broadcastGameState()
       }
     }()
@@ -240,7 +260,7 @@ func intermittentlyRemoveDeadPlayers() {
 
 func init() {
   _sgg = superghost.NewRoom(superghost.Config{
-        MaxPlayers: 3,
+        MaxPlayers: 5,
         MinWordLength: 5,
         IsPublic: true,
       })
@@ -259,6 +279,7 @@ func main() {
   http.HandleFunc("/rebuttal", rebuttalHandler)
   http.HandleFunc("/heartbeat", heartbeatHandler)
   http.HandleFunc("/concession", concessionHandler)
+  http.HandleFunc("/leave", leaveHandler)
 
   err := http.ListenAndServe(":9090", nil) // setting listening port
   if err != nil {

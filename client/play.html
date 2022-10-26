@@ -4,9 +4,11 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<!--
 <style>
-{{template "style" .}}
+{ {template "style" .}}
 </style>
+-->
 
 <head> <title>Play superghost</title> </head>
 
@@ -31,22 +33,22 @@
   </fieldset>
 </form>
 
+<form method="POST" action="/challenge-is-word" id="challengeForm">
+	<fieldset id=challengeFieldSet disabled=true>
+		<button type=button id=isWordButton>challenge; this is a word</button>
+		<button type=button id=noContinuationButton>challenge; there's no continuation</button>
+    <button type=button id=concedeButton>concede</button>
+	</fieldset>
+</form>
+
 <form method="POST" action="/rebuttal" id="rebutForm">
   <fieldset id=rebutFieldSet disabled>
     <input type=text name=continuation placeholder="Enter your continuation"
         pattern="^[a-z]+" autocorrect=off autocapitalize=none>
     <br><button type=submit id=rebutButton>rebut</button>
-    <button type=button id=concedeButton>concede</button>
   </fieldset>
 </form>
 
-<form method="POST" action="/challenge-is-word" id="challengeForm">
-  <span id=orChallenge>or challenge:</span>
-	<fieldset id=challengeFieldSet disabled=true>
-		<button type=button  id=isWordButton>this is a word</button>
-		<br><button type=button id=noContinuationButton>there's no continuation</button>
-	</fieldset>
-</form>
 
 <span id=lastRoundResultSpan></span>
 
