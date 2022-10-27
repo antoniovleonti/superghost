@@ -71,7 +71,6 @@ func (sgg *Room) RemoveDeadPlayers(duration time.Duration) bool {
   return sgg.s.RemoveDeadPlayers(duration)
 }
 
-
 func (sgg *Room) Concede(cookies []*http.Cookie) error {
   return sgg.s.Concede(cookies)
 }
