@@ -37,45 +37,45 @@ func (sgg *Room) GetJsonGameState() ([]byte, error) {
 }
 
 func (sgg *Room) GetValidCookie(cookies []*http.Cookie) (string, bool) {
-  return sgg.s.getValidCookie(cookies)
+  return sgg.s.GetValidCookie(cookies)
 }
 
 func (sgg *Room) AddPlayer(username string) (*http.Cookie, error) {
-  return sgg.s.addPlayer(username, sgg.c.MaxPlayers)
+  return sgg.s.AddPlayer(username, sgg.c.MaxPlayers)
 }
 
 func (sgg *Room) ChallengeIsWord(cookies []*http.Cookie) error {
-  return sgg.s.challengeIsWord(cookies, sgg.c.MinWordLength)
+  return sgg.s.ChallengeIsWord(cookies, sgg.c.MinWordLength)
 }
 
 func (sgg *Room) ChallengeContinuation(cookies []*http.Cookie) error {
-  return sgg.s.challengeContinuation(cookies)
+  return sgg.s.ChallengeContinuation(cookies)
 }
 
 func (sgg *Room) RebutChallenge(
     cookies []*http.Cookie, continuation string, giveUp bool) error {
-  return sgg.s.rebutChallenge(cookies, continuation,
+  return sgg.s.RebutChallenge(cookies, continuation,
                               giveUp, sgg.c.MinWordLength)
 }
 
 func (sgg *Room) AffixWord(
     cookies []*http.Cookie, prefix string, suffix string) error {
-  return sgg.s.affixWord(cookies, prefix, suffix)
+  return sgg.s.AffixWord(cookies, prefix, suffix)
 }
 
 func (sgg *Room) Heartbeat(cookies []*http.Cookie) error {
-  return sgg.s.heartbeat(cookies)
+  return sgg.s.Heartbeat(cookies)
 }
 
 func (sgg *Room) RemoveDeadPlayers(duration time.Duration) bool {
-  return sgg.s.removeDeadPlayers(duration)
+  return sgg.s.RemoveDeadPlayers(duration)
 }
 
 
 func (sgg *Room) Concede(cookies []*http.Cookie) error {
-  return sgg.s.concede(cookies)
+  return sgg.s.Concede(cookies)
 }
 
 func (sgg *Room) Leave(cookies []*http.Cookie) error {
-  return sgg.s.leave(cookies)
+  return sgg.s.Leave(cookies)
 }
