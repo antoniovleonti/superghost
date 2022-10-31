@@ -8,10 +8,10 @@ Long-term goals:
 Medium-term goals:
 
 Server:
-- [ ] Intra-game logic implemented & stable
 - [ ] Multiple games
 - [ ] Reclaiming resources (kicking idle players, ending empty games)
 - [ ] TLS
+- [x] Intra-game logic implemented & stable
 - [x] Basic player tracking (via cookies)
 
 Frontend:
@@ -19,3 +19,5 @@ Frontend:
 - [ ] All necessary pages (list games, create a game, join a game, play)
 
 Short-term goals:
+- [ ] Multiple games
+- [ ] Index page UI
