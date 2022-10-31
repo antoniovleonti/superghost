@@ -1,0 +1,94 @@
+<html>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+
+* {
+  font-family: baskerville;
+  margin-top: 0px;
+}
+
+div {
+  border: solid 1px;
+}
+
+.wrapper {
+  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(3, 320px);
+  grid-template-rows: repeat(7, 100px);
+  gap: 20px 34px;
+}
+
+.head {
+  grid-column: 1 / -1;
+  grid-row: 1 / 3;
+}
+
+.stem {
+  grid-column: 1 / -1;
+  grid-row: 3 / 4;
+}
+
+.actions {
+  grid-column: 1 / -1;
+  grid-row: 4 / 5;
+}
+
+.bodyl{
+  grid-column: 1 / 2;
+  grid-row: 5 / -1;
+}
+
+.bodyr{
+  grid-column: -1 / -2;
+  grid-row: 5 / -1;
+}
+
+.bodyc{
+  grid-column: 2 / 3;
+  grid-row: 5 / -1;
+}
+
+.current-stem {
+  font-size: 32;
+}
+
+</style>
+
+<div class="wrapper">
+
+<div class="head">
+<head><h1>SUPERGHOST</h1><head>
+</div>
+
+<div class="stem">
+<h2>Current stem</h2>
+</div>
+
+<div class=actions>
+<h2>Actions</h2>
+</div>
+
+<div class="bodyl">
+<h2>Previous words</h2>
+</div>
+
+<div class="bodyc">
+<h2>Chat</h2>
+</div>
+
+<div class="bodyr">
+<h2>Players</h2>
+</div>
+
+</div> <!--wrapper-->
+
+</body>
+
+<script>
+{{template "script" .}}
+</script>
+
+</html>
