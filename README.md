@@ -19,4 +19,3 @@ Frontend:
 - [ ] All necessary pages (list games, create a game, join a game, play)
 
 Short-term goals:
-- [ ] Intra-game unit tests

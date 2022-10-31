@@ -93,8 +93,10 @@ func (gs *state) getValidCookie(cookies []*http.Cookie) (string, bool) {
 
 func (gs *state) AddPlayer(
     username string, maxPlayers int) (*http.Cookie, error) {
+  fmt.Println("test")
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
+  fmt.Println("test")
 
   if len(gs.players) >= maxPlayers {
     return nil, fmt.Errorf("player limit reached")
@@ -356,7 +358,7 @@ func (gs *state) Leave(cookies []*http.Cookie) error {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
-  username, ok := gs.GetValidCookie(cookies)
+  username, ok := gs.getValidCookie(cookies)
   if !ok {
     return fmt.Errorf("no credentials provided")
   }
@@ -373,7 +375,7 @@ func (gs *state) Heartbeat(cookies []*http.Cookie) error {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
-  username, ok := gs.GetValidCookie(cookies) // needs mutex
+  username, ok := gs.getValidCookie(cookies) // needs mutex
   if !ok {
     return fmt.Errorf("no credentials provided")
   }
@@ -390,7 +392,8 @@ func (gs *state) Concede(cookies []*http.Cookie) error {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
-  username, ok := gs.GetValidCookie(cookies)
+
+  username, ok := gs.getValidCookie(cookies)
   if !ok {
     return fmt.Errorf("no credentials provided")
   }
