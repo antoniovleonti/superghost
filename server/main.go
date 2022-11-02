@@ -165,8 +165,8 @@ func (sgs *SuperghostServer) rebuttalHandler(w http.ResponseWriter,
       if err != nil {
         giveUp = false
       }
-      err = sgs.Rooms["asdf"].Room.RebutChallenge(r.Cookies(), r.FormValue("continuation"),
-                                 giveUp)
+      err = sgs.Rooms["asdf"].Room.RebutChallenge(
+          r.Cookies(), r.FormValue("continuation"), giveUp)
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
