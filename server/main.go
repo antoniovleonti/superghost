@@ -259,7 +259,7 @@ func (sgs *SuperghostServer) nextState(w http.ResponseWriter, r *http.Request) {
     case http.MethodGet:
       roomWrapper.ListenersMutex.Lock()
       myChan := make(chan string)
-      roomWrapper.Listeners = append(sgs.Rooms["asdf"].Listeners, myChan)
+      roomWrapper.Listeners = append(roomWrapper.Listeners, myChan)
       roomWrapper.ListenersMutex.Unlock()
 
       fmt.Fprint(w, <-myChan)
