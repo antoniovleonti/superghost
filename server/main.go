@@ -2,14 +2,12 @@ package main
 
 import (
   "fmt"
-  "log"
+  "github.com/go-chi/chi/v5"
   "net/http"
   "strconv"
   "superghost"
   "sync"
   "text/template"
-  "time"
-  // "github.com/gorilla/mux"
 )
 
 type RoomWrapper struct {
@@ -27,22 +25,45 @@ func NewRoomWrapper(config superghost.Config) *RoomWrapper {
 
 type SuperghostServer struct {
   Rooms map[string]*RoomWrapper
+  Router chi.Router
 }
 
 func NewSuperghostServer() *SuperghostServer {
   server := new(SuperghostServer)
   server.Rooms = make(map[string]*RoomWrapper)
+
+  server.Router = chi.NewRouter()
+  server.Router.Get("/rooms/{roomID}", server.room)
+  server.Router.Get("/rooms/{roomID}/join", server.join)
+  server.Router.Post("/rooms/{roomID}/join", server.join)
+  server.Router.Get("/rooms/{roomID}/next-state", server.nextState)
+  server.Router.Get("/rooms/{roomID}/current-state", server.currentState)
+  server.Router.Post("/rooms/{roomID}/affix", server.affix)
+  server.Router.Post("/rooms/{roomID}/challenge-is-word", server.challengeIsWord)
+  server.Router.Post(
+      "/rooms/{roomID}/challenge-continuation", server.challengeContinuation)
+  server.Router.Post("/rooms/{roomID}/rebuttal", server.rebuttal)
+  server.Router.Post("/rooms/{roomID}/heartbeat", server.heartbeat)
+  server.Router.Post("/rooms/{roomID}/concession", server.concession)
+  server.Router.Post("/rooms/{roomID}/leave", server.leave)
+
   return server
 }
 
-func (sgs *SuperghostServer) rootHandler(w http.ResponseWriter,
-                                         r *http.Request) {
+func (sgs *SuperghostServer) room(w http.ResponseWriter, r *http.Request) {
+  roomID := chi.URLParam(r, "roomID")
+  roomWrapper, ok := sgs.Rooms[roomID]
+  if !ok {
+    fmt.Println(roomID + " is not a valid room")
+    http.NotFound(w, r)
+    return
+  }
   switch r.Method {
 
     case http.MethodGet:
-      username, ok := sgs.Rooms["asdf"].Room.GetValidCookie(r.Cookies())
+      username, ok := roomWrapper.Room.GetValidCookie(r.Cookies())
       if !ok {
-        http.Redirect(w, r, "/join", http.StatusFound)
+        http.Redirect(w, r, fmt.Sprintf("/rooms/%s/join", roomID), http.StatusFound)
         return
       }
       t, err := template.ParseFiles("../client/play.html",
@@ -65,11 +86,17 @@ func (sgs *SuperghostServer) rootHandler(w http.ResponseWriter,
   }
 }
 
-func (sgs *SuperghostServer) joinHandler(w http.ResponseWriter,
-                                         r *http.Request) {
-  if _, ok := sgs.Rooms["asdf"].Room.GetValidCookie(r.Cookies()); ok {
-    // they've already joined -- redirect them back to the game
-    http.Redirect(w, r, "/", http.StatusFound)
+func (sgs *SuperghostServer) join(w http.ResponseWriter, r *http.Request) {
+  roomID := chi.URLParam(r, "roomID")
+  roomWrapper, ok := sgs.Rooms[roomID]
+  if !ok {
+    http.NotFound(w, r)
+    return
+  }
+
+  if _, ok := roomWrapper.Room.GetValidCookie(r.Cookies()); ok {
+    // they've already joined -- redirect them back to the room
+    http.Redirect(w, r, fmt.Sprintf("/rooms/%s", roomID), http.StatusFound)
     return
   }
   switch r.Method {
@@ -82,18 +109,18 @@ func (sgs *SuperghostServer) joinHandler(w http.ResponseWriter,
         fmt.Println(err.Error())
         panic(err.Error())
       }
-      t.Execute(w, map[string] string {"GameId": "/(gameid)"})
+      t.Execute(w, map[string] string {"GameId": "/" + roomID})
 
     case http.MethodPost:
       r.ParseForm()
-      cookie, err := sgs.Rooms["asdf"].Room.AddPlayer(r.FormValue("username"))
+      cookie, err := roomWrapper.Room.AddPlayer(r.FormValue("username"))
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
       }
       http.SetCookie(w, cookie)
-      http.Redirect(w, r, "/", http.StatusSeeOther)
-      sgs.Rooms["asdf"].BroadcastGameState()
+      http.Redirect(w, r, fmt.Sprintf("/rooms/%s", roomID), http.StatusSeeOther)
+      roomWrapper.BroadcastGameState()
       return
 
     default:
@@ -101,62 +128,84 @@ func (sgs *SuperghostServer) joinHandler(w http.ResponseWriter,
   }
 }
 
-func (sgs *SuperghostServer) wordHandler(w http.ResponseWriter,
-                                         r *http.Request) {
+func (sgs *SuperghostServer) affix(w http.ResponseWriter, r *http.Request) {
+  roomID := chi.URLParam(r, "roomID")
+  roomWrapper, ok := sgs.Rooms[roomID]
+  if !ok {
+    http.NotFound(w, r)
+    return
+  }
   switch r.Method {
 
     case http.MethodPost:
       r.ParseForm()
-      err := sgs.Rooms["asdf"].Room.AffixWord(r.Cookies(), r.FormValue("prefix"),
+      err := roomWrapper.Room.AffixWord(r.Cookies(), r.FormValue("prefix"),
                             r.FormValue("suffix"))
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
       }
       fmt.Fprint(w, "success")
-      sgs.Rooms["asdf"].BroadcastGameState()
+      roomWrapper.BroadcastGameState()
 
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
   }
 }
 
-func (sgs *SuperghostServer) challengeIsWordHandler(w http.ResponseWriter,
-                                                    r *http.Request) {
+func (sgs *SuperghostServer) challengeIsWord(w http.ResponseWriter,
+                                             r *http.Request) {
+  roomID := chi.URLParam(r, "roomID")
+  roomWrapper, ok := sgs.Rooms[roomID]
+  if !ok {
+    http.NotFound(w, r)
+    return
+  }
   switch r.Method {
 
     case http.MethodPost:
-      err := sgs.Rooms["asdf"].Room.ChallengeIsWord(r.Cookies())
+      err := roomWrapper.Room.ChallengeIsWord(r.Cookies())
       if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return
       }
-      sgs.Rooms["asdf"].BroadcastGameState()
+      roomWrapper.BroadcastGameState()
 
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
   }
 }
 
-func (sgs *SuperghostServer) challengeContinuationHandler(w http.ResponseWriter, 
-                                                          r *http.Request) {
+func (sgs *SuperghostServer) challengeContinuation(w http.ResponseWriter,
+                                                   r *http.Request) {
+  roomID := chi.URLParam(r, "roomID")
+  roomWrapper, ok := sgs.Rooms[roomID]
+  if !ok {
+    http.NotFound(w, r)
+    return
+  }
   switch r.Method {
     case http.MethodPost:
 
-      err := sgs.Rooms["asdf"].Room.ChallengeContinuation(r.Cookies())
+      err := roomWrapper.Room.ChallengeContinuation(r.Cookies())
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
       }
-      sgs.Rooms["asdf"].BroadcastGameState()
+      roomWrapper.BroadcastGameState()
 
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
   }
 }
 
-func (sgs *SuperghostServer) rebuttalHandler(w http.ResponseWriter,
-                                             r *http.Request) {
+func (sgs *SuperghostServer) rebuttal(w http.ResponseWriter, r *http.Request) {
+  roomID := chi.URLParam(r, "roomID")
+  roomWrapper, ok := sgs.Rooms[roomID]
+  if !ok {
+    http.NotFound(w, r)
+    return
+  }
   switch r.Method {
     case http.MethodPost:
       // it must be your turn to challenge.
@@ -165,26 +214,32 @@ func (sgs *SuperghostServer) rebuttalHandler(w http.ResponseWriter,
       if err != nil {
         giveUp = false
       }
-      err = sgs.Rooms["asdf"].Room.RebutChallenge(
+      err = roomWrapper.Room.RebutChallenge(
           r.Cookies(), r.FormValue("continuation"), giveUp)
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
       }
-      sgs.Rooms["asdf"].BroadcastGameState()
+      roomWrapper.BroadcastGameState()
 
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
   }
 }
 
-func (sgs *SuperghostServer) stateHandler(w http.ResponseWriter,
+func (sgs *SuperghostServer) currentState(w http.ResponseWriter,
                                           r *http.Request) {
+  roomID := chi.URLParam(r, "roomID")
+  roomWrapper, ok := sgs.Rooms[roomID]
+  if !ok {
+    http.NotFound(w, r)
+    return
+  }
   switch r.Method {
     case http.MethodGet:
-      b, err := sgs.Rooms["asdf"].Room.GetJsonGameState()
+      b, err := roomWrapper.Room.GetJsonGameState()
       if err != nil {
-        panic ("couldn't marshal game state")
+        panic ("couldn't marshal room state")
       }
       fmt.Fprint(w, string(b))
     default:
@@ -192,15 +247,20 @@ func (sgs *SuperghostServer) stateHandler(w http.ResponseWriter,
   }
 }
 
-func (sgs *SuperghostServer) nextStateHandler(w http.ResponseWriter,
-                                              r *http.Request) {
+func (sgs *SuperghostServer) nextState(w http.ResponseWriter, r *http.Request) {
+  roomID := chi.URLParam(r, "roomID")
+  roomWrapper, ok := sgs.Rooms[roomID]
+  if !ok {
+    http.NotFound(w, r)
+    return
+  }
   switch r.Method {
 
     case http.MethodGet:
-      sgs.Rooms["asdf"].ListenersMutex.Lock()
+      roomWrapper.ListenersMutex.Lock()
       myChan := make(chan string)
-      sgs.Rooms["asdf"].Listeners = append(sgs.Rooms["asdf"].Listeners, myChan)
-      sgs.Rooms["asdf"].ListenersMutex.Unlock()
+      roomWrapper.Listeners = append(sgs.Rooms["asdf"].Listeners, myChan)
+      roomWrapper.ListenersMutex.Unlock()
 
       fmt.Fprint(w, <-myChan)
 
@@ -209,14 +269,19 @@ func (sgs *SuperghostServer) nextStateHandler(w http.ResponseWriter,
   }
 }
 
-func (sgs *SuperghostServer) heartbeatHandler(w http.ResponseWriter,
-                                              r *http.Request) {
+func (sgs *SuperghostServer) heartbeat(w http.ResponseWriter, r *http.Request) {
+  roomID := chi.URLParam(r, "roomID")
+  roomWrapper, ok := sgs.Rooms[roomID]
+  if !ok {
+    http.NotFound(w, r)
+    return
+  }
   switch r.Method {
 
     case http.MethodPost:
-      err := sgs.Rooms["asdf"].Room.Heartbeat(r.Cookies())
+      err := roomWrapper.Room.Heartbeat(r.Cookies())
       if err != nil {
-        // they got kicked from the game & came back most likely
+        // they got kicked from the room & came back most likely
         http.Error(w, "couldn't find player", http.StatusNotFound)
         return
       }
@@ -227,36 +292,47 @@ func (sgs *SuperghostServer) heartbeatHandler(w http.ResponseWriter,
   }
 }
 
-func (sgs *SuperghostServer) concessionHandler(w http.ResponseWriter,
-                                               r *http.Request) {
+func (sgs *SuperghostServer) concession(w http.ResponseWriter,
+                                        r *http.Request) {
+  roomID := chi.URLParam(r, "roomID")
+  roomWrapper, ok := sgs.Rooms[roomID]
+  if !ok {
+    http.NotFound(w, r)
+    return
+  }
   switch r.Method {
 
     case http.MethodPost:
-      err := sgs.Rooms["asdf"].Room.Concede(r.Cookies())
+      err := roomWrapper.Room.Concede(r.Cookies())
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
       }
       fmt.Fprint(w, "success")
-      sgs.Rooms["asdf"].BroadcastGameState()
+      roomWrapper.BroadcastGameState()
 
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
   }
 }
 
-func (sgs *SuperghostServer) leaveHandler(w http.ResponseWriter,
-                                          r *http.Request) {
+func (sgs *SuperghostServer) leave(w http.ResponseWriter, r *http.Request) {
+  roomID := chi.URLParam(r, "roomID")
+  roomWrapper, ok := sgs.Rooms[roomID]
+  if !ok {
+    http.NotFound(w, r)
+    return
+  }
   switch r.Method {
 
     case http.MethodPost:
-      err := sgs.Rooms["asdf"].Room.Leave(r.Cookies())
+      err := roomWrapper.Room.Leave(r.Cookies())
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
       }
-      http.Redirect(w, r, "/join", http.StatusFound)
-      sgs.Rooms["asdf"].BroadcastGameState()
+      http.Redirect(w, r, "/", http.StatusFound)
+      roomWrapper.BroadcastGameState()
 
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
@@ -269,49 +345,35 @@ func (rw *RoomWrapper) BroadcastGameState() {
 
   b, err := rw.Room.GetJsonGameState()
   if err != nil {
-    panic("couldn't get json game state") // something's gone terribly wrong
+    panic("couldn't get json room state") // something's gone terribly wrong
   }
   s := string(b)
-  fmt.Println(s) // print all updates to game state to the console!
+  fmt.Println(s) // print all updates to room state to the console!
   for _, c := range rw.Listeners {
     c <- s
   }
   rw.Listeners = make([]chan string, 0) // clear
 }
 
-func (sgs *SuperghostServer) intermittentlyRemoveDeadPlayers() {
-  for _ = range time.Tick(time.Second) {
-    go func () {
-      if sgs.Rooms["asdf"].Room.RemoveDeadPlayers(10 * time.Minute) {
-        sgs.Rooms["asdf"].BroadcastGameState()
-      }
-    }()
-  }
-}
+// func (sgs *SuperghostServer) intermittentlyRemoveDeadPlayers() {
+  //for _ = range time.Tick(time.Second) {
+    //go func () {
+      //if roomWrapper.Room.RemoveDeadPlayers(10 * time.Minute) {
+        //roomWrapper.BroadcastGameState()
+      //}
+    //}()
+  //}
+//}
 
 func main() {
-  sgs := NewSuperghostServer()
-  sgs.Rooms["asdf"] = NewRoomWrapper(superghost.Config{
+  server := NewSuperghostServer()
+  server.Rooms["test-room"] = NewRoomWrapper(superghost.Config{
         MaxPlayers: 5,
         MinWordLength: 5,
         IsPublic: true,
       })
 
-  http.HandleFunc("/", sgs.rootHandler) // setting router rule
-  http.HandleFunc("/join", sgs.joinHandler) // setting router rule
-  http.HandleFunc("/next-state", sgs.nextStateHandler)
-  http.HandleFunc("/state", sgs.stateHandler)
-  http.HandleFunc("/word", sgs.wordHandler)
-  http.HandleFunc("/challenge-is-word", sgs.challengeIsWordHandler)
-  http.HandleFunc("/challenge-continuation", sgs.challengeContinuationHandler)
-  http.HandleFunc("/rebuttal", sgs.rebuttalHandler)
-  http.HandleFunc("/heartbeat", sgs.heartbeatHandler)
-  http.HandleFunc("/concession", sgs.concessionHandler)
-  http.HandleFunc("/leave", sgs.leaveHandler)
-
-  err := http.ListenAndServe(":9090", nil) // setting listening port
-  if err != nil {
-    log.Fatal("ListenAndServe: ", err)
-  }
+  http.ListenAndServe(":9090", server.Router)
+  // manually add a room for testing
 }
 
