@@ -40,8 +40,9 @@ func (sgg *Room) GetValidCookie(cookies []*http.Cookie) (string, bool) {
   return sgg.s.GetValidCookie(cookies)
 }
 
-func (sgg *Room) AddPlayer(username string) (*http.Cookie, error) {
-  return sgg.s.AddPlayer(username, sgg.c.MaxPlayers)
+func (sgg *Room) AddPlayer(username string, path string) (
+    *http.Cookie, error) {
+  return sgg.s.AddPlayer(username, path, sgg.c.MaxPlayers)
 }
 
 func (sgg *Room) ChallengeIsWord(cookies []*http.Cookie) error {

@@ -33,6 +33,7 @@ func NewSuperghostServer() *SuperghostServer {
   server.Rooms = make(map[string]*RoomWrapper)
 
   server.Router = chi.NewRouter()
+  server.Router.Get("/", server.home)
   server.Router.Get("/rooms/{roomID}", server.room)
   server.Router.Get("/rooms/{roomID}/join", server.join)
   server.Router.Post("/rooms/{roomID}/join", server.join)
@@ -43,16 +44,32 @@ func NewSuperghostServer() *SuperghostServer {
   server.Router.Post(
       "/rooms/{roomID}/challenge-continuation", server.challengeContinuation)
   server.Router.Post("/rooms/{roomID}/rebuttal", server.rebuttal)
-  server.Router.Post("/rooms/{roomID}/heartbeat", server.heartbeat)
   server.Router.Post("/rooms/{roomID}/concession", server.concession)
   server.Router.Post("/rooms/{roomID}/leave", server.leave)
 
   return server
 }
 
-func (sgs *SuperghostServer) room(w http.ResponseWriter, r *http.Request) {
+func (s *SuperghostServer) home(w http.ResponseWriter, r *http.Request) {
+  switch r.Method {
+
+    case http.MethodGet:
+      t, err := template.ParseFiles("../client/index.html")
+      if err != nil {
+        http.Error(w, "unexpected error", http.StatusInternalServerError)
+        panic(err.Error())
+      }
+      err = t.Execute(w, map[string] string {})
+      return
+
+    default:
+      http.Error(w, "", http.StatusMethodNotAllowed)
+  }
+}
+
+func (s *SuperghostServer) room(w http.ResponseWriter, r *http.Request) {
   roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := sgs.Rooms[roomID]
+  roomWrapper, ok := s.Rooms[roomID]
   if !ok {
     fmt.Println(roomID + " is not a valid room")
     http.NotFound(w, r)
@@ -63,7 +80,8 @@ func (sgs *SuperghostServer) room(w http.ResponseWriter, r *http.Request) {
     case http.MethodGet:
       username, ok := roomWrapper.Room.GetValidCookie(r.Cookies())
       if !ok {
-        http.Redirect(w, r, fmt.Sprintf("/rooms/%s/join", roomID), http.StatusFound)
+        http.Redirect(w, r, fmt.Sprintf("/rooms/%s/join", roomID),
+                      http.StatusFound)
         return
       }
       t, err := template.ParseFiles("../client/play.html",
@@ -71,12 +89,11 @@ func (sgs *SuperghostServer) room(w http.ResponseWriter, r *http.Request) {
                                     "../client/style.css",
                                     "../client/sharedHtml.tmpl")
       if err != nil {
-        fmt.Println(err.Error())
         panic(err.Error())
       }
-      err = t.Execute(w, map[string] string {"Username": username})
+      err = t.Execute(w, map[string] string {"Username": username,
+                                             "RoomID": roomID})
       if err != nil {
-        fmt.Println(err.Error())
         panic(err.Error())
       }
       return
@@ -86,9 +103,9 @@ func (sgs *SuperghostServer) room(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-func (sgs *SuperghostServer) join(w http.ResponseWriter, r *http.Request) {
+func (s *SuperghostServer) join(w http.ResponseWriter, r *http.Request) {
   roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := sgs.Rooms[roomID]
+  roomWrapper, ok := s.Rooms[roomID]
   if !ok {
     http.NotFound(w, r)
     return
@@ -106,14 +123,14 @@ func (sgs *SuperghostServer) join(w http.ResponseWriter, r *http.Request) {
                                     "../client/style.css",
                                     "../client/sharedHtml.tmpl")
       if err != nil {
-        fmt.Println(err.Error())
         panic(err.Error())
       }
       t.Execute(w, map[string] string {"GameId": "/" + roomID})
 
     case http.MethodPost:
       r.ParseForm()
-      cookie, err := roomWrapper.Room.AddPlayer(r.FormValue("username"))
+      cookie, err := roomWrapper.Room.AddPlayer(r.FormValue("username"),
+                                                "/rooms/" + roomID)
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
@@ -128,9 +145,9 @@ func (sgs *SuperghostServer) join(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-func (sgs *SuperghostServer) affix(w http.ResponseWriter, r *http.Request) {
+func (s *SuperghostServer) affix(w http.ResponseWriter, r *http.Request) {
   roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := sgs.Rooms[roomID]
+  roomWrapper, ok := s.Rooms[roomID]
   if !ok {
     http.NotFound(w, r)
     return
@@ -153,10 +170,10 @@ func (sgs *SuperghostServer) affix(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-func (sgs *SuperghostServer) challengeIsWord(w http.ResponseWriter,
+func (s *SuperghostServer) challengeIsWord(w http.ResponseWriter,
                                              r *http.Request) {
   roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := sgs.Rooms[roomID]
+  roomWrapper, ok := s.Rooms[roomID]
   if !ok {
     http.NotFound(w, r)
     return
@@ -176,10 +193,10 @@ func (sgs *SuperghostServer) challengeIsWord(w http.ResponseWriter,
   }
 }
 
-func (sgs *SuperghostServer) challengeContinuation(w http.ResponseWriter,
+func (s *SuperghostServer) challengeContinuation(w http.ResponseWriter,
                                                    r *http.Request) {
   roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := sgs.Rooms[roomID]
+  roomWrapper, ok := s.Rooms[roomID]
   if !ok {
     http.NotFound(w, r)
     return
@@ -199,9 +216,9 @@ func (sgs *SuperghostServer) challengeContinuation(w http.ResponseWriter,
   }
 }
 
-func (sgs *SuperghostServer) rebuttal(w http.ResponseWriter, r *http.Request) {
+func (s *SuperghostServer) rebuttal(w http.ResponseWriter, r *http.Request) {
   roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := sgs.Rooms[roomID]
+  roomWrapper, ok := s.Rooms[roomID]
   if !ok {
     http.NotFound(w, r)
     return
@@ -227,10 +244,10 @@ func (sgs *SuperghostServer) rebuttal(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-func (sgs *SuperghostServer) currentState(w http.ResponseWriter,
+func (s *SuperghostServer) currentState(w http.ResponseWriter,
                                           r *http.Request) {
   roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := sgs.Rooms[roomID]
+  roomWrapper, ok := s.Rooms[roomID]
   if !ok {
     http.NotFound(w, r)
     return
@@ -247,9 +264,9 @@ func (sgs *SuperghostServer) currentState(w http.ResponseWriter,
   }
 }
 
-func (sgs *SuperghostServer) nextState(w http.ResponseWriter, r *http.Request) {
+func (s *SuperghostServer) nextState(w http.ResponseWriter, r *http.Request) {
   roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := sgs.Rooms[roomID]
+  roomWrapper, ok := s.Rooms[roomID]
   if !ok {
     http.NotFound(w, r)
     return
@@ -269,9 +286,9 @@ func (sgs *SuperghostServer) nextState(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-func (sgs *SuperghostServer) heartbeat(w http.ResponseWriter, r *http.Request) {
+func (s *SuperghostServer) heartbeat(w http.ResponseWriter, r *http.Request) {
   roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := sgs.Rooms[roomID]
+  roomWrapper, ok := s.Rooms[roomID]
   if !ok {
     http.NotFound(w, r)
     return
@@ -292,10 +309,10 @@ func (sgs *SuperghostServer) heartbeat(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-func (sgs *SuperghostServer) concession(w http.ResponseWriter,
+func (s *SuperghostServer) concession(w http.ResponseWriter,
                                         r *http.Request) {
   roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := sgs.Rooms[roomID]
+  roomWrapper, ok := s.Rooms[roomID]
   if !ok {
     http.NotFound(w, r)
     return
@@ -316,9 +333,9 @@ func (sgs *SuperghostServer) concession(w http.ResponseWriter,
   }
 }
 
-func (sgs *SuperghostServer) leave(w http.ResponseWriter, r *http.Request) {
+func (s *SuperghostServer) leave(w http.ResponseWriter, r *http.Request) {
   roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := sgs.Rooms[roomID]
+  roomWrapper, ok := s.Rooms[roomID]
   if !ok {
     http.NotFound(w, r)
     return
@@ -355,7 +372,7 @@ func (rw *RoomWrapper) BroadcastGameState() {
   rw.Listeners = make([]chan string, 0) // clear
 }
 
-// func (sgs *SuperghostServer) intermittentlyRemoveDeadPlayers() {
+// func (s *SuperghostServer) intermittentlyRemoveDeadPlayers() {
   //for _ = range time.Tick(time.Second) {
     //go func () {
       //if roomWrapper.Room.RemoveDeadPlayers(10 * time.Minute) {

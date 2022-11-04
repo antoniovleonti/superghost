@@ -29,11 +29,11 @@ func (p *Player) heartbeat() {
   p.lastHeartbeat = time.Now()
 }
 
-func NewPlayer(username string) *Player {
+func NewPlayer(username string, path string) *Player {
   p := new(Player)
   p.username = username
   p.score = 0
-  p.cookie = newCookie(username)
+  p.cookie = newCookie(path, username)
   p.lastHeartbeat = time.Now()
   return p
 }

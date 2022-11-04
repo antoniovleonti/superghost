@@ -1,12 +1,6 @@
 <html>
 
-{{template "sharedHtmlLinks" .}}
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<style>
-{{template "style" .}}
-</style>
 
 <head>
 <title>Join game</title>
@@ -17,7 +11,7 @@
 {{template "sharedHtmlHeader" .}}
 
 <h2>Join {{.GameId}}</h2>
-<form method="POST" action="/join">
+<form method="POST" action="join">
   Enter a username:
   <br><input type="text" name="username" maxlength=16 pattern="[a-zA-Z0-9]+"
       autocapitalize=none autocorrect=false>

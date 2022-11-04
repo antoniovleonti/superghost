@@ -22,7 +22,7 @@
 
 <h2 id=statusSpan>Status</h2>
 
-<form method="POST" action="/word" id="affixForm">
+<form id=affix-form>
   <fieldset id="affixFieldSet" disabled=true>
     <input type="text" id="prefixText" name="prefix" maxlength="1" size="1"
         pattern="[a-z]" autocorrect="off" autocapitalize="none">
@@ -33,7 +33,7 @@
   </fieldset>
 </form>
 
-<form method="POST" action="/challenge-is-word" id="challengeForm">
+<form id==challenge-form>
 	<fieldset id=challengeFieldSet disabled=true>
 		<button type=button id=isWordButton>challenge; this is a word</button>
 		<button type=button id=noContinuationButton>challenge; there's no continuation</button>
@@ -41,7 +41,7 @@
 	</fieldset>
 </form>
 
-<form method="POST" action="/rebuttal" id="rebutForm">
+<form id=rebut-form>
   <fieldset id=rebutFieldSet disabled>
     <input type=text name=continuation placeholder="Enter your continuation"
         pattern="^[a-z]+" autocorrect=off autocapitalize=none>

@@ -2,10 +2,10 @@
 
 const kMyUsername = "{{.Username}}"
 
-const affixForm = document.getElementById("affixForm")
+const affixForm = document.getElementById("affix-form")
 const affixFieldSet = document.getElementById("affixFieldSet")
 
-const rebutForm = document.getElementById("rebutForm")
+const rebutForm = document.getElementById("rebut-form")
 const concedeButton = document.getElementById("concedeButton")
 
 const challengeFieldSet = document.getElementById("challengeFieldSet")
@@ -22,7 +22,7 @@ leaveButton.innerHTML = "leave"
 
 leaveButton.addEventListener("click", function(e){
   var xhr = new XMLHttpRequest()
-  xhr.open("POST", "/leave")
+  xhr.open("POST", "{{.RoomID}}/leave")
   xhr.send()
 })
 
@@ -36,7 +36,7 @@ affixForm.addEventListener("submit", function(e){
 		}
 		affixForm.reset()
 	}
-  xhr.open("POST", "/word")
+  xhr.open("POST", "{{.RoomID}}/affix")
   xhr.send(new URLSearchParams(new FormData(affixForm)))
 })
 
@@ -50,7 +50,7 @@ rebutForm.addEventListener("submit", function(e){
 		}
 		rebutForm.reset()
 	}
-  xhr.open("POST", "/rebuttal")
+  xhr.open("POST", "{{.RoomID}}/rebuttal")
   xhr.send(new URLSearchParams(new FormData(rebutForm)))
 })
 
@@ -63,7 +63,7 @@ concedeButton.addEventListener("click", function(e){
 			return // I should probably do something useful here
 		}
 	}
-  xhr.open("POST", "/concession")
+  xhr.open("POST", "{{.RoomID}}/concession")
   xhr.send()
 })
 
@@ -76,7 +76,7 @@ isWordButton.addEventListener("click", function(e){
 			return // I should probably do something useful here
 		}
 	}
-  xhr.open("POST", "/challenge-is-word")
+  xhr.open("POST", "{{.RoomID}}/challenge-is-word")
   xhr.send()
 })
 
@@ -88,20 +88,20 @@ noContinuationButton.addEventListener("click", function(e){
 			return // I should probably do something useful here
 		}
 	}
-  xhr.open("POST", "/challenge-continuation")
+  xhr.open("POST", "{{.RoomID}}/challenge-continuation")
   xhr.send()
 })
 
-setInterval(function() {
-  var xhr = new XMLHttpRequest()
-	xhr.onload = function() {
-		if (xhr.status != 200) {
-      window.location.href = "/join"
-		}
-	}
-  xhr.open("POST", "/heartbeat?" + new Date().getTime())
-  xhr.send()
-}, 100) // every 100 ms
+// setInterval(function() {
+  // var xhr = new XMLHttpRequest()
+	// xhr.onload = function() {
+		// if (xhr.status != 200) {
+      // window.location.href = "join"
+		// }
+	// }
+  // xhr.open("POST", "heartbeat?" + new Date().getTime())
+  // xhr.send()
+// }, 100) // every 100 ms
 
 function longPollNextGameState () {
   var xhr = new XMLHttpRequest()
@@ -111,7 +111,7 @@ function longPollNextGameState () {
     renderEverything(state)
     longPollNextGameState()
   }
-  xhr.open("GET", "/next-state")
+  xhr.open("GET", "{{.RoomID}}/next-state")
   xhr.send()
 }
 
@@ -122,7 +122,7 @@ function getCurrentGameState () {
     console.log(state)
     renderEverything(state)
   }
-  xhr.open("GET", "/state")
+  xhr.open("GET", "{{.RoomID}}/current-state")
   xhr.send()
 }
 

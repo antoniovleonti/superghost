@@ -91,8 +91,9 @@ func (gs *state) getValidCookie(cookies []*http.Cookie) (string, bool) {
   return "", false
 }
 
-func (gs *state) AddPlayer(
-    username string, maxPlayers int) (*http.Cookie, error) {
+func (gs *state) AddPlayer(username string,
+                           path string,
+                           maxPlayers int) (*http.Cookie, error) {
   fmt.Println("test")
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
@@ -108,7 +109,7 @@ func (gs *state) AddPlayer(
     return nil, fmt.Errorf("username '%s' already in use", username)
   }
 
-  p := NewPlayer(username)
+  p := NewPlayer(username, path)
   gs.usernameToPlayer[username] = p
   gs.players = append(gs.players, p)
   if len(gs.players) >= 2 && gs.awaiting == kPlayers {

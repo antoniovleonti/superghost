@@ -25,12 +25,13 @@ func validateWord(word string) (isWord bool, err error) {
   return resp.StatusCode == http.StatusOK, nil
 }
 
-func newCookie(username string) *http.Cookie {
+func newCookie(path string, username string) *http.Cookie {
   c := new(http.Cookie)
   c.Name = username
   c.Value = getRandBase64String(32)
   c.Expires = time.Now().Add(24 * time.Hour)
-  c.Path = "/"
+  c.Path = path
+  fmt.Println(c.String())
   return c
 }
 
