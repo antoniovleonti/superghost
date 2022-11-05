@@ -5,6 +5,7 @@ import (
   "github.com/go-chi/chi/v5"
   "net/http"
   "strconv"
+  "strings"
   "superghost"
   "sync"
   "text/template"
@@ -34,6 +35,7 @@ func NewSuperghostServer() *SuperghostServer {
 
   server.Router = chi.NewRouter()
   server.Router.Get("/", server.home)
+  server.Router.Post("/rooms", server.rooms)
   server.Router.Get("/rooms/{roomID}", server.room)
   server.Router.Get("/rooms/{roomID}/join", server.join)
   server.Router.Post("/rooms/{roomID}/join", server.join)
@@ -50,6 +52,13 @@ func NewSuperghostServer() *SuperghostServer {
   return server
 }
 
+func redirectURIList(w http.ResponseWriter, URIs []string) {
+	w.Header().Set("Content-Type", "text/uri-list; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusSeeOther)
+	fmt.Fprintln(w, strings.Join(URIs, "\n"))
+}
+
 func (s *SuperghostServer) home(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
 
@@ -60,6 +69,43 @@ func (s *SuperghostServer) home(w http.ResponseWriter, r *http.Request) {
         panic(err.Error())
       }
       err = t.Execute(w, map[string] string {})
+      return
+
+    default:
+      http.Error(w, "", http.StatusMethodNotAllowed)
+  }
+}
+
+func (s *SuperghostServer) rooms(w http.ResponseWriter, r *http.Request) {
+  switch r.Method {
+
+    case http.MethodPost:
+      // validate params
+      parseFormErr := r.ParseForm()
+      if parseFormErr != nil {
+        http.Error(w, parseFormErr.Error(), http.StatusBadRequest)
+        return
+      }
+      maxPlayers, maxPlayersErr := strconv.Atoi(r.FormValue("maxPlayers"))
+      if maxPlayersErr != nil {
+        http.Error(w, maxPlayersErr.Error(), http.StatusBadRequest)
+        return
+      }
+      minWordLength, minWordLengthErr :=
+          strconv.Atoi(r.FormValue("minWordLength"))
+      if minWordLengthErr != nil {
+        http.Error(w, minWordLengthErr.Error(), http.StatusBadRequest)
+        return
+      }
+      isPublic := r.FormValue("isPublic") == "on"
+
+      roomID := superghost.GetRandBase32String(6)
+      s.Rooms[roomID] = NewRoomWrapper(superghost.Config{
+            MaxPlayers: maxPlayers,
+            MinWordLength: minWordLength,
+            IsPublic: isPublic,
+          })
+      redirectURIList(w, []string{"/rooms/" + roomID + "/join"})
       return
 
     default:
@@ -136,7 +182,7 @@ func (s *SuperghostServer) join(w http.ResponseWriter, r *http.Request) {
         return
       }
       http.SetCookie(w, cookie)
-      http.Redirect(w, r, fmt.Sprintf("/rooms/%s", roomID), http.StatusSeeOther)
+      redirectURIList(w, []string{"/rooms/" + roomID})
       roomWrapper.BroadcastGameState()
       return
 
@@ -348,7 +394,7 @@ func (s *SuperghostServer) leave(w http.ResponseWriter, r *http.Request) {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
       }
-      http.Redirect(w, r, "/", http.StatusFound)
+      redirectURIList(w, []string{"/"})
       roomWrapper.BroadcastGameState()
 
     default:

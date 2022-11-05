@@ -21,7 +21,13 @@ let leaveButton = document.createElement("button");
 leaveButton.innerHTML = "leave"
 
 leaveButton.addEventListener("click", function(e){
+  e.preventDefault() // do not write response to screen
   var xhr = new XMLHttpRequest()
+	xhr.onload = function() {
+    if (xhr.status == 303) { // "see other"
+      location.href = xhr.responseText
+    }
+	}
   xhr.open("POST", "{{.RoomID}}/leave")
   xhr.send()
 })

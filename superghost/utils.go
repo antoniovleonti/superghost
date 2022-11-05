@@ -3,6 +3,7 @@ package superghost
 import(
   "crypto/rand"
   "encoding/base64"
+  "encoding/base32"
   "net/http"
   "regexp"
   "time"
@@ -28,20 +29,29 @@ func validateWord(word string) (isWord bool, err error) {
 func newCookie(path string, username string) *http.Cookie {
   c := new(http.Cookie)
   c.Name = username
-  c.Value = getRandBase64String(32)
+  c.Value = GetRandBase64String(32)
   c.Expires = time.Now().Add(24 * time.Hour)
   c.Path = path
   fmt.Println(c.String())
   return c
 }
 
-func getRandBase64String(length int) string {
+func GetRandBase64String(length int) string {
   randomBytes := make([]byte, length)
   _, err := rand.Read(randomBytes)
   if err != nil {
     panic(err)
   }
   return base64.StdEncoding.EncodeToString(randomBytes)[:length]
+}
+
+func GetRandBase32String(length int) string {
+  randomBytes := make([]byte, length)
+  _, err := rand.Read(randomBytes)
+  if err != nil {
+    panic(err)
+  }
+  return base32.StdEncoding.EncodeToString(randomBytes)[:length]
 }
 
 func init() {
