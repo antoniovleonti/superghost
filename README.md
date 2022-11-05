@@ -9,4 +9,4 @@
 - [x] Basic player tracking (via cookies)
 
 ## Short-term goals:
-- [ ] Add game creation endpoint to server
+- [ ] Migrate all PRG users to new redirectURIList & update client behavior
