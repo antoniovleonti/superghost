@@ -37,6 +37,7 @@ func NewSuperghostServer() *SuperghostServer {
   server.Router.Get("/", server.home)
   server.Router.Post("/rooms", server.rooms)
   server.Router.Get("/rooms/{roomID}", server.room)
+  server.Router.Head("/rooms/{roomID}", server.room)
   server.Router.Get("/rooms/{roomID}/join", server.join)
   server.Router.Post("/rooms/{roomID}/join", server.join)
   server.Router.Get("/rooms/{roomID}/next-state", server.nextState)
@@ -142,6 +143,11 @@ func (s *SuperghostServer) room(w http.ResponseWriter, r *http.Request) {
       if err != nil {
         panic(err.Error())
       }
+      return
+
+    case http.MethodHead:
+      w.WriteHeader(http.StatusOK)
+      fmt.Fprint(w, "") // No body, just the header
       return
 
     default:
