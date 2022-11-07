@@ -18,7 +18,7 @@ const lastRoundResultSpan = document.getElementById("lastRoundResultSpan")
 const playerList = document.getElementById("playerList")
 
 let leaveButton = document.createElement("button");
-leaveButton.innerHTML = "leave"
+leaveButton.innerHTML = "Leave"
 
 leaveButton.addEventListener("click", function(e){
   e.preventDefault() // do not write response to screen
@@ -150,6 +150,7 @@ function renderStatus(mode, lastPlayerUsername, nextPlayerUsername) {
     default:
       break
   }
+  document.title = statusSpan.innerHTML
 }
 
 function renderLastRoundResult(lastRoundResult) {
