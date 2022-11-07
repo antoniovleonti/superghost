@@ -10,28 +10,32 @@
 
 
 <h1>SUPERGHOST</h1>
-<form id=join-form>
-  <h2>Join a game:</h2>
-  <br><input type="text" name=game-id><input type="submit" value="join">
+<form id=join-room-form>
+  <h2>Join a room:</h2>
+  <br><input type=text name=room-id>
+  <input type=submit value=Join>
+  <span id=join-err></span>
 </form>
-<form id=create-game-form>
-  <h2>Create a game:</h2><br>
+
+<form id=create-room-form>
+  <h2>Create a room:</h2><br>
   <label for=max-players>Max players:</label>
   <input type=number id=max-players name=maxPlayers min=2 max=8><br>
   <label for=min-length>Min word length:</label>
   <input type=number id=min-length name=minWordLength min=2 max=45><br>
   <label for=is-public>Publicly visible:</label>
   <input type=checkbox id=is-public name=isPublic><br>
-  <input type=submit value=create>
+  <input type=submit value=Create>
 </form>
 
 </body>
 
 <script>
 
-const createGameForm = document.getElementById("create-game-form")
+const createRoomForm = document.getElementById("create-room-form")
+const joinRoomForm = document.getElementById("join-room-form")
 
-createGameForm.addEventListener("submit", function(e){
+createRoomForm.addEventListener("submit", function(e){
   e.preventDefault() // do not write response to screen
   var xhr = new XMLHttpRequest()
 	xhr.onload = function() {
@@ -40,7 +44,24 @@ createGameForm.addEventListener("submit", function(e){
     }
 	}
   xhr.open("POST", "rooms")
-  xhr.send(new URLSearchParams(new FormData(createGameForm)))
+  xhr.send(new URLSearchParams(new FormData(createRoomForm)))
+})
+
+joinRoomForm.addEventListener("submit", function(e){
+  e.preventDefault()
+  roomURI = "rooms/" + joinRoomForm.elements["room-id"].value
+
+  var xhr = new XMLHttpRequest()
+	xhr.onload = function() {
+    if (xhr.status == 200) {
+      document.getElementById("join-err").innerHTML = ""
+      window.location.href = roomURI
+    } else {
+      document.getElementById("join-err").innerHTML = "<i>Not found.</i>"
+    }
+	}
+  xhr.open("HEAD", roomURI)
+  xhr.send()
 })
 </script>
 
