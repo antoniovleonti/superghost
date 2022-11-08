@@ -9,5 +9,4 @@
 - [x] Basic player tracking (via cookies)
 
 ## Short-term goals:
-- [ ] Remove long idle games
-- [ ] Votekick
+- [ ] New UI
