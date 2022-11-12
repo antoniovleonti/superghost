@@ -261,7 +261,8 @@ func (gs *state) AffixWord(
   }
   if !_affixPattern.MatchString(prefix + suffix) {
     return fmt.Errorf(
-        "exactly one alphabetical prefix OR suffix must be provided")
+        "exactly one alphabetical prefix OR suffix must be provided " +
+        "(received: {prefix: '%s', suffix: '%s'})", prefix, suffix)
   }
 
 
