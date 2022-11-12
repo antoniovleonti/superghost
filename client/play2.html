@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+
+* { font-family: baskerville; }
+
+h1, h2, h3, h4, h5, h6 { margin: 0px; }
+
+th { text-align: left; }
+
+div { border: none; }
+
+/***** CLASSES *****/
+
+.scrollable-zebra {
+  list-style-type: none;
+  overflow:hidden;
+  padding:0;
+  overflow-y:scroll;
+  border: solid 1px;
+  margin: 16px 0px 16px 0px;
+  width:100%;
+}
+.scrollable-zebra li:nth-child(even),
+                  tr:nth-child(even) {
+  background-color: #f2f2f2;
+}
+
+.bottom-div { height: calc(100% - 32px - 28px); }
+
+.header-link {
+  color: black;
+  margin-right: 8px;
+}
+
+/***** GRID & GRID CONTAINERS *****/
+
+#wrapper {
+  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(3, 288px);
+  grid-template-rows: repeat(6, 108px);
+  gap: 20px 34px;
+}
+
+#head {
+  grid-column: 1 / -1;
+  grid-row: 1 / 2;
+}
+
+#play {
+  border-top: solid 1px;
+  grid-column: 1 / -1;
+  grid-row: 2 / 4;
+}
+#play input[type=text] {
+  font-size: 24px;
+  width: 32px;
+}
+
+#log {
+  border-top: solid 1px;
+  grid-column: 1 / 2;
+  grid-row: 4 / -1;
+}
+
+#players {
+  border-top: solid 1px;
+  grid-column: -1 / -2;
+  grid-row: 4 / -1;
+}
+
+#chat {
+  border-top: solid 1px;
+  grid-column: 2 / 3;
+  grid-row: 4 / -1;
+}
+
+/***** CONTENT *****/
+
+#players-table-wrapper {
+  height: auto;
+  max-height: calc(100% - 32px - 28px);
+}
+#players-table { width: 100%; }
+
+#chat-ol { height: calc(100% - 32px - 16px - 28px - 21px); }
+
+#actions-panel {
+  margin-top: 32px;
+  text-align: center;
+}
+#affix-form, #rebut-form {
+  font-size: 24px;
+  margin: 0px;
+}
+input[name="prefix"] { text-align: right; }
+
+#chat-form input[type=text] { width: 75% }
+
+@media (max-width: 934px) {
+
+  #wrapper {
+    grid-template-columns: auto;
+    grid-template-rows: repeat(9, 108px);
+  }
+
+  #log{
+    grid-column: 1 / -1;
+    grid-row: 4 / 6;
+  }
+
+  #chat{
+    grid-column: 1 / -1;
+    grid-row: 6 / 8;
+  }
+
+  #players{
+    grid-column: 1 / -1;
+    grid-row: 8 / -1;
+  }
+}
+
+</style>
+
+<head><title>SUPERGHOST</title><head>
+
+<body>
+  <div id=wrapper>
+
+    <div id=head>
+      <h1>SUPERGHOST</h1>
+      <a class=header-link href="/">home</a>
+      <a class=header-link href="/how-to-play">how to play</a>
+      <a class=header-link href="/about">about</a>
+    </div>
+
+    <div id=play>
+      <h2>Play</h2>
+      <span id=short-status>Short status.</span>
+
+      <div id=actions-panel>
+        <form id=affix-form>
+          <input type=text name=prefix maxlength=1 size=1
+              pattern="[a-zA-Z]" autocorrect=off autocapitalize=none>
+          <span class=stem-display></span>
+          <input type=text name=suffix maxlength=1 size=1
+              pattern="[a-zA-Z]" autocorrect=off autocapitalize=none><br>
+          <button type=submit id=affixButton>Affix letter</button>
+        </form>
+        <form id=rebut-form>
+          <input type=text name=prefix pattern="[a-zA-Z]"
+              autocorrect=off autocapitalize=none>
+          <span class=stem-display></span>
+          <input type=text name=suffix pattern="[a-zA-Z]"
+              autocorrect=off autocapitalize=none><br>
+          <button type=submit id=affixButton>Submit continuation</button>
+        </form>
+        <i>- or -</i><br>
+        <button type=button id=concede>Concede</button>
+        <button type=button id=ch-cont>Challenge (continutation)</button>
+        <button type=button id=ch-word>Challenge (this is a valid word)</button>
+      </div>
+    </div>
+
+    <div id=log>
+      <h2>Game log</h2>
+      <ol id=log-ol class="bottom-div scrollable-zebra">
+      </ol>
+    </div>
+
+    <div id=chat>
+      <h2>Chat</h2>
+      <ol id=chat-ol class="bottom-div scrollable-zebra">
+      </ol>
+      <form id=chat-form>
+        <input type=text><button type=submit>Send</button>
+      </form>
+    </div>
+
+    <div id=players>
+      <h2>Players</h2>
+      <div id=players-table-wrapper class="bottom-div scrollable-zebra">
+      <table id=players-table>
+        <thead>
+          <tr><th>Name</th><th>Score</th><th>Actions</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      </div>
+    </div>
+
+  </div>
+</body>
+
+<script>
+
+// Static displays
+const shortStatus = document.getElementById("short-status");
+const stemDisplays = document.getElementsByClassName("stem-display");
+const logOL = document.getElementById("log-ol");
+const chatOL = document.getElementById("chat-ol");
+const playersTable =
+    document.getElementById("players-table").getElementsByTagName("tbody")[0];
+
+// Static actions
+const affixForm = document.getElementById("affix-form");
+const rebutForm = document.getElementById("rebut-form");
+const concedeButton = document.getElementById("concede");
+const challengeContButton = document.getElementById("ch-cont");
+const challengeIsWordButton = document.getElementById("ch-word");
+
+// Dynamic buttons
+const leaveButton = document.createElement("button");
+leaveButton.innerHTML = "Leave";
+
+// Server-side rendered constants
+const kMyUsername = "{{.Username}}";
+const kRoomID = "{{.RoomID}}";
+
+/***** RENDERING / POPULATING ELEMENTS *****/
+
+// Populate player list.
+function populatePlayers(players) {
+  playersTable.innerHTML = "";
+  for (const p of players) {
+    isMe = p.username == kMyUsername;
+    let row = playersTable.insertRow();
+
+    let usernameCell = row.insertCell();
+    usernameCell.innerHTML = p.username + (isMe ? " <i>(you)</i>" : "");
+
+    let scoreCell = row.insertCell();
+    scoreCell.innerHTML = "GHOST".slice(0, Math.min(p.score, 5))
+                              + (p.score > 5 ? " +" + (p.score - 5) : "");
+
+    let actionsCell = row.insertCell();
+    if (isMe) {
+      actionsCell.appendChild(leaveButton);
+    } else {
+      // create and append a votekick button
+    }
+  }
+}
+
+// Enable / disable & hide / show buttons according to whose turn it is.
+function updateButtons(isMyTurn, awaiting) {
+  // Hide one, show the other
+  affixForm.style.display = awaiting != "rebut" ? 'block' : 'none';
+  rebutForm.style.display = awaiting == "rebut" ? 'block' : 'none';
+
+  for (const f of [affixForm, rebutForm]) {
+    for (const e of f.elements) {
+      e.disabled = !isMyTurn;
+    }
+  }
+  challengeContButton.disabled = challengeIsWordButton.disabled =
+      !(awaiting == "edit" && isMyTurn);
+}
+
+// Write a short sentence describing the state of the game to the screen.
+function writeShortStatus(nextPlayer, lastPlayer, awaiting) {
+  let nextOrYour = nextPlayer == kMyUsername ? "your" : nextPlayer + "'s";
+  let lastOrYour = lastPlayer == kMyUsername ? "your" : lastPlayer + "'s";
+  switch (awaiting) {
+    case "edit":
+      shortStatus.innerHTML = "It is " + nextOrYour + " turn to add a letter.";
+      break;
+    case "rebut":
+      shortStatus.innerHTML = "It is " + nextOrYour + " turn to rebut "
+                                  + lastOrYour + " challenge.";
+      break;
+    case "insufficient players":
+      shortStatus.innerHTML =
+          "Waiting for players (share the URL to invite someone!).";
+      break;
+    default:  // (Indicative of a bug)
+      shortStatus.innerHTML = "? (Not implemented)";
+  }
+}
+
+// Write current word stem to the screen
+function writeStem(stem) {
+  for (const d of stemDisplays) {
+    d.innerHTML = stem.toUpperCase();
+  }
+}
+
+function renderGameState(state) {
+  let nextPlayer = state.players[state.nextPlayer].username;
+  populatePlayers(state.players);
+  updateButtons(nextPlayer == kMyUsername, state.awaiting);
+  writeShortStatus(nextPlayer, state.lastPlayer, state.awaiting);
+  writeStem(state.word);
+}
+
+/***** BUTTON HANDLERS *****/
+function sendRequest(method, path, getDataFn=null, onloadFn=null) {
+  var xhr = new XMLHttpRequest();
+  xhr.onload = function() {
+    if (onloadFn != null) {
+      onloadFn(xhr);
+    } else {
+      // Convenience onload default
+      getDefaultOnload(null)(xhr);
+    }
+  }
+  xhr.open(method, kRoomID + "/" + path);
+  if (getDataFn!=null) console.log(getDataFn());
+  xhr.send(getDataFn==null ? null : getDataFn());
+}
+
+function getDefaultListener(method, path, form, onloadFn) {
+  return function(e) {
+    e.preventDefault() // do not redirect
+    sendRequest(method, path, form, onloadFn);
+  }
+}
+
+function getDefaultOnload(form) {
+  return function(xhr) {
+    if (xhr.status != 200) {
+      console.log("Err: '" + xhr.responseText + "'.");
+      return;
+    }
+    if (form != null) {
+      form.reset();
+    }
+  }
+}
+
+affixForm.addEventListener("submit", getDefaultListener(
+    "POST", "affix", ()=>new URLSearchParams(new FormData(affixForm)),
+    getDefaultOnload(affixForm)));
+
+rebutForm.addEventListener("submit", getDefaultListener(
+    "POST", "rebuttal", ()=>new URLSearchParams(new FormData(rebutForm)),
+    getDefaultOnload(rebutForm)));
+
+concedeButton.addEventListener("click", getDefaultListener("POST",
+                                                           "concession"));
+
+challengeContButton.addEventListener(
+    "click", getDefaultListener("POST", "challenge-continuation"));
+
+challengeIsWordButton.addEventListener(
+    "click", getDefaultListener("POST", "challenge-is-word"));
+
+leaveButton.addEventListener(
+    "click", getDefaultListener("POST", "leave"));
+
+/***** STATE HANDLERS *****/
+function getCurrentGameState() {
+  sendRequest("GET", "current-state", null, function(xhr) {
+    let state = JSON.parse(xhr.responseText);
+    console.log(state);
+    renderGameState(state);
+  });
+}
+
+function getNextGameState() {
+  sendRequest("GET", "next-state", null, function(xhr) {
+    let state = JSON.parse(xhr.responseText);
+    console.log(state);
+    renderGameState(state);
+    getNextGameState();
+  });
+}
+
+// Enter game loop
+getCurrentGameState();
+getNextGameState();
+
+</script>
+
+</html>

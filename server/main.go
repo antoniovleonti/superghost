@@ -131,10 +131,7 @@ func (s *SuperghostServer) room(w http.ResponseWriter, r *http.Request) {
                       http.StatusFound)
         return
       }
-      t, err := template.ParseFiles("../client/play.html",
-                                    "../client/script.js",
-                                    "../client/style.css",
-                                    "../client/sharedHtml.tmpl")
+      t, err := template.ParseFiles("../client/play2.html")
       if err != nil {
         panic(err.Error())
       }
