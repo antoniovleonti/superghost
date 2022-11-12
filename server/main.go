@@ -168,9 +168,7 @@ func (s *SuperghostServer) join(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
 
     case http.MethodGet:
-      t, err := template.ParseFiles("../client/join.html",
-                                    "../client/style.css",
-                                    "../client/sharedHtml.tmpl")
+      t, err := template.ParseFiles("../client/join.html")
       if err != nil {
         panic(err.Error())
       }
