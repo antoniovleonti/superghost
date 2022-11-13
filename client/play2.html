@@ -247,6 +247,13 @@ function populatePlayers(players) {
   }
 }
 
+// 
+function appendToGameLog(status) {
+  newLI = document.createElement("li");
+  newLI.innerHTML = status;
+  logOL.appendChild(newLI);
+}
+
 // Enable / disable & hide / show buttons according to whose turn it is.
 function updateButtons(isMyTurn, awaiting) {
   // Hide one, show the other
