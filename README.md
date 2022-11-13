@@ -1,10 +1,9 @@
 # SUPERGHOST Web App
 
 # Todo:
-- [ ] Votekick
-- [ ] Remove long idle games
 - [ ] Game log
+- [ ] Elimination
+- [ ] Remove long idle games
 - [ ] Join page
 - [ ] Index (landing) page
-- [ ] Elimination
 - [ ] Chat
