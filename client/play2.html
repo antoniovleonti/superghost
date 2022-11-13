@@ -197,6 +197,7 @@ input[name="prefix"] { text-align: right; }
 </body>
 
 <script>
+{{template "ClientUtils" .}}
 
 // Static displays
 const shortStatus = document.getElementById("short-status");
@@ -295,66 +296,36 @@ function renderGameState(state) {
   updateButtons(nextPlayer == kMyUsername, state.awaiting);
   writeShortStatus(nextPlayer, state.lastPlayer, state.awaiting);
   writeStem(state.word);
+  appendToGameLog(state.lastRoundResult);
 }
 
 /***** BUTTON HANDLERS *****/
-function sendRequest(method, path, getDataFn=null, onloadFn=null) {
-  var xhr = new XMLHttpRequest();
-  xhr.onload = function() {
-    if (onloadFn != null) {
-      onloadFn(xhr);
-    } else {
-      // Convenience onload default
-      getDefaultOnload(null)(xhr);
-    }
-  }
-  xhr.open(method, kRoomID + "/" + path);
-  if (getDataFn!=null) console.log(getDataFn());
-  xhr.send(getDataFn==null ? null : getDataFn());
-}
-
-function getDefaultListener(method, path, form, onloadFn) {
-  return function(e) {
-    e.preventDefault() // do not redirect
-    sendRequest(method, path, form, onloadFn);
-  }
-}
-
-function getDefaultOnload(form) {
-  return function(xhr) {
-    if (xhr.status != 200) {
-      console.log("Err: '" + xhr.responseText + "'.");
-      return;
-    }
-    if (form != null) {
-      form.reset();
-    }
-  }
-}
-
 affixForm.addEventListener("submit", getDefaultListener(
-    "POST", "affix", ()=>new URLSearchParams(new FormData(affixForm)),
+    "POST", kRoomID + "/" + "affix",
+    ()=>new URLSearchParams(new FormData(affixForm)),
     getDefaultOnload(affixForm)));
 
 rebutForm.addEventListener("submit", getDefaultListener(
-    "POST", "rebuttal", ()=>new URLSearchParams(new FormData(rebutForm)),
+    "POST", kRoomID + "/" + "rebuttal",
+    ()=>new URLSearchParams(new FormData(rebutForm)),
     getDefaultOnload(rebutForm)));
 
-concedeButton.addEventListener("click", getDefaultListener("POST",
-                                                           "concession"));
+concedeButton.addEventListener("click", getDefaultListener(
+    "POST", kRoomID + "/" + "concession"));
 
 challengeContButton.addEventListener(
-    "click", getDefaultListener("POST", "challenge-continuation"));
+    "click", getDefaultListener("POST",
+                                kRoomID + "/" + "challenge-continuation"));
 
 challengeIsWordButton.addEventListener(
-    "click", getDefaultListener("POST", "challenge-is-word"));
+    "click", getDefaultListener("POST", kRoomID + "/" + "challenge-is-word"));
 
 leaveButton.addEventListener(
-    "click", getDefaultListener("POST", "leave"));
+    "click", getDefaultListener("POST", kRoomID + "/" + "leave"));
 
 /***** STATE HANDLERS *****/
 function getCurrentGameState() {
-  sendRequest("GET", "current-state", null, function(xhr) {
+  sendRequest("GET", kRoomID + "/" + "current-state", null, function(xhr) {
     let state = JSON.parse(xhr.responseText);
     console.log(state);
     renderGameState(state);
@@ -362,7 +333,7 @@ function getCurrentGameState() {
 }
 
 function getNextGameState() {
-  sendRequest("GET", "next-state", null, function(xhr) {
+  sendRequest("GET", kRoomID + "/" + "next-state", null, function(xhr) {
     let state = JSON.parse(xhr.responseText);
     console.log(state);
     renderGameState(state);

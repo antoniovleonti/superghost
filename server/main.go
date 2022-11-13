@@ -131,7 +131,8 @@ func (s *SuperghostServer) room(w http.ResponseWriter, r *http.Request) {
                       http.StatusFound)
         return
       }
-      t, err := template.ParseFiles("../client/play2.html")
+      t, err := template.ParseFiles("../client/play2.html",
+                                    "../client/client_utils.js")
       if err != nil {
         panic(err.Error())
       }
@@ -438,6 +439,5 @@ func main() {
       })
 
   http.ListenAndServe(":9090", server.Router)
-  // manually add a room for testing
 }
 
