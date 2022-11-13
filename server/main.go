@@ -169,11 +169,12 @@ func (s *SuperghostServer) join(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
 
     case http.MethodGet:
-      t, err := template.ParseFiles("../client/join.html")
+      t, err := template.ParseFiles("../client/join.html",
+                                    "../client/client_utils.js")
       if err != nil {
         panic(err.Error())
       }
-      t.Execute(w, map[string] string {"GameId": "/" + roomID})
+      t.Execute(w, map[string] string {"RoomID": roomID})
 
     case http.MethodPost:
       r.ParseForm()

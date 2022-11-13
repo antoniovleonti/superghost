@@ -9,32 +9,34 @@
 <body>
 
 <h1>SUPERGHOST</h1>
-<h2>Join {{.GameId}}</h2>
+<h2>Join {{.RoomID}}</h2>
 <form id=join-form>
   Enter a username:
   <br><input type=text name=username maxlength=16 pattern="[a-zA-Z0-9]+"
       autocapitalize=none autocorrect=false>
   <input type=submit>
 </form>
+<span id=status></span>
 
 <!-- listing players here would be nice so players know what names are taken -->
 </body>
 
 <script>
+const kRoomID = "{{.RoomID}}";
+{{template "ClientUtils" .}}
 
-const joinForm = document.getElementById("join-form")
+const joinForm = document.getElementById("join-form");
+const status = document.getElementById("status");
 
-joinForm.addEventListener("submit", function(e){
-  e.preventDefault() // do not write response to screen
-  var xhr = new XMLHttpRequest()
-	xhr.onload = function() {
-    if (xhr.status == 303) { // "see other"
-      location.href = xhr.responseText
-    }
-	}
-  xhr.open("POST", "join")
-  xhr.send(new URLSearchParams(new FormData(joinForm)))
-})
+joinForm.addEventListener("submit", getDefaultListener(
+    "POST", "join", ()=>new URLSearchParams(new FormData(joinForm)),
+    function(xhr) {
+      status.innerHTML = xhr.responseText;
+      if (xhr.status == 303) {  // "see other"
+        location.href = xhr.responseText;  // Redirect
+      }
+    }));
+
 </script>
 
 </html>
