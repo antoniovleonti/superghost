@@ -383,7 +383,6 @@ func (gs *state) Concede(cookies []*http.Cookie) error {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
-
   username, ok := gs.getValidCookie(cookies)
   if !ok {
     return fmt.Errorf("no credentials provided")
@@ -391,14 +390,14 @@ func (gs *state) Concede(cookies []*http.Cookie) error {
   switch gs.awaiting {
 
     case kPlayers:
-      return fmt.Errorf("cannot Concede right now")
+      return fmt.Errorf("cannot concede right now")
 
     case kEdit:
       if len(gs.stem) == 0 {
-        return fmt.Errorf("cannot Concede when word is empty")
+        return fmt.Errorf("cannot concede when word is empty")
       }
       gs.usernameToPlayer[username].score++
-      gs.newRound(fmt.Sprintf("%s Conceded the round at '%s'; +1 %s",
+      gs.newRound(fmt.Sprintf("%s conceded the round at '%s'; +1 %s",
                               username, gs.stem, username))
 
     case kRebut:
@@ -409,12 +408,12 @@ func (gs *state) Concede(cookies []*http.Cookie) error {
       gs.usernameToPlayer[username].score++
       if username == gs.lastPlayer {
         gs.newRound(fmt.Sprintf(
-            "%s Conceded the round after challenging %s at '%s'; +1 %s",
+            "%s conceded the round after challenging %s at '%s'; +1 %s",
             username, gs.players[gs.nextPlayer].username, gs.stem, username))
         return nil
       } // else
       gs.newRound(fmt.Sprintf(
-          "%s Conceded the round after being challenged by %s at '%s'; +1 %s",
+          "%s conceded the round after being challenged by %s at '%s'; +1 %s",
           username, gs.lastPlayer, gs.stem, username))
   }
   return nil
