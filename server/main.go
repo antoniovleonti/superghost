@@ -43,12 +43,15 @@ func NewSuperghostServer() *SuperghostServer {
   server.Router.Get("/rooms/{roomID}/next-state", server.nextState)
   server.Router.Get("/rooms/{roomID}/current-state", server.currentState)
   server.Router.Post("/rooms/{roomID}/affix", server.affix)
-  server.Router.Post("/rooms/{roomID}/challenge-is-word", server.challengeIsWord)
-  server.Router.Post(
-      "/rooms/{roomID}/challenge-continuation", server.challengeContinuation)
+  server.Router.Post("/rooms/{roomID}/challenge-is-word",
+                     server.challengeIsWord)
+  server.Router.Post("/rooms/{roomID}/challenge-continuation",
+                     server.challengeContinuation)
   server.Router.Post("/rooms/{roomID}/rebuttal", server.rebuttal)
   server.Router.Post("/rooms/{roomID}/concession", server.concession)
   server.Router.Post("/rooms/{roomID}/leave", server.leave)
+  server.Router.Post("/rooms/{roomID}/players/{playerID}/votekick",
+                     server.votekick)
 
   return server
 }
@@ -395,6 +398,29 @@ func (s *SuperghostServer) leave(w http.ResponseWriter, r *http.Request) {
         return
       }
       redirectURIList(w, []string{"/"})
+      roomWrapper.BroadcastGameState()
+
+    default:
+      http.Error(w, "", http.StatusMethodNotAllowed)
+  }
+}
+
+func (s *SuperghostServer) votekick(w http.ResponseWriter, r *http.Request) {
+  roomID := chi.URLParam(r, "roomID")
+  roomWrapper, ok := s.Rooms[roomID]
+  if !ok {
+    http.NotFound(w, r)
+    return
+  }
+  playerID := chi.URLParam(r, "playerID")
+  switch r.Method {
+
+    case http.MethodPost:
+      err := roomWrapper.Room.Votekick(r.Cookies(), playerID)
+      if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+      }
       roomWrapper.BroadcastGameState()
 
     default:

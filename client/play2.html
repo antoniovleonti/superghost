@@ -218,6 +218,14 @@ const challengeIsWordButton = document.getElementById("ch-word");
 const leaveButton = document.createElement("button");
 leaveButton.innerHTML = "Leave";
 
+function getVotekickButton(playerToKick) {
+  let votekickButton = document.createElement("button");
+  votekickButton.innerHTML = "Votekick";
+  votekickButton.addEventListener("click", getDefaultListener(
+      "POST", kRoomID + "/players/" + playerToKick + "/votekick", null, null));
+  return votekickButton;
+}
+
 // Server-side rendered constants
 const kMyUsername = "{{.Username}}";
 const kRoomID = "{{.RoomID}}";
@@ -242,7 +250,7 @@ function populatePlayers(players) {
     if (isMe) {
       actionsCell.appendChild(leaveButton);
     } else {
-      // create and append a votekick button
+      actionsCell.appendChild(getVotekickButton(p.username));
     }
   }
 }

@@ -418,3 +418,32 @@ func (gs *state) Concede(cookies []*http.Cookie) error {
   }
   return nil
 }
+
+func (gs *state) Votekick(cookies []*http.Cookie, usernameToKick string) error {
+  gs.mutex.Lock()
+  defer gs.mutex.Unlock()
+
+  voter, ok := gs.getValidCookie(cookies)
+  if !ok {
+    return fmt.Errorf("no credentials provided")
+  }
+
+  playerToKick, ok := gs.usernameToPlayer[usernameToKick]
+  if !ok {
+    return fmt.Errorf("player not found");
+  }
+
+  playerToKick.votekick(voter)
+  // if a majority has voted to kick the player, remove them from the game
+  if float64(playerToKick.numVotesToKick) >=
+     float64(len(gs.players)) / 1.9 {
+    for i, p := range gs.players {
+      if p.username == usernameToKick {
+        gs.removePlayer(i)
+        break
+      }
+    }
+  }
+  return nil
+}
+
