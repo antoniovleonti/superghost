@@ -64,7 +64,8 @@ func (s *SuperghostServer) home(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
 
     case http.MethodGet:
-      t, err := template.ParseFiles("../client/index.html")
+      t, err := template.ParseFiles("../client/index.html",
+                                    "../client/client_utils.js")
       if err != nil {
         http.Error(w, "unexpected error", http.StatusInternalServerError)
         panic(err.Error())
