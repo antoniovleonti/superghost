@@ -152,14 +152,14 @@ input[name="prefix"] { text-align: right; }
           <button type=submit id=affixButton>Affix letter</button>
         </form>
         <form id=rebut-form>
-          <input type=text name=prefix pattern="[a-zA-Z]"
+          <input type=text name=prefix pattern="[a-zA-Z]*"
               autocorrect=off autocapitalize=none>
           <span class=stem-display></span>
-          <input type=text name=suffix pattern="[a-zA-Z]"
+          <input type=text name=suffix pattern="[a-zA-Z]*"
               autocorrect=off autocapitalize=none><br>
           <button type=submit id=affixButton>Submit continuation</button>
         </form>
-        <i>- or -</i><br>
+        <i>- or -</i><br><br>
         <button type=button id=concede>Concede</button>
         <button type=button id=ch-cont>Challenge (continutation)</button>
         <button type=button id=ch-word>Challenge (this is a valid word)</button>

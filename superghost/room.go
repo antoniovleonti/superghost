@@ -54,9 +54,8 @@ func (sgg *Room) ChallengeContinuation(cookies []*http.Cookie) error {
 }
 
 func (sgg *Room) RebutChallenge(
-    cookies []*http.Cookie, continuation string, giveUp bool) error {
-  return sgg.s.RebutChallenge(cookies, continuation,
-                              giveUp, sgg.c.MinWordLength)
+    cookies []*http.Cookie, prefix string, suffix string) error {
+  return sgg.s.RebutChallenge(cookies, prefix, suffix, sgg.c.MinWordLength)
 }
 
 func (sgg *Room) AffixWord(

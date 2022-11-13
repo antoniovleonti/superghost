@@ -276,12 +276,8 @@ func (s *SuperghostServer) rebuttal(w http.ResponseWriter, r *http.Request) {
     case http.MethodPost:
       // it must be your turn to challenge.
       r.ParseForm()
-      giveUp, err := strconv.ParseBool(r.FormValue("giveUp"))
-      if err != nil {
-        giveUp = false
-      }
-      err = roomWrapper.Room.RebutChallenge(
-          r.Cookies(), r.FormValue("continuation"), giveUp)
+      err := roomWrapper.Room.RebutChallenge(
+          r.Cookies(), r.FormValue("prefix"), r.FormValue("suffix"))
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
