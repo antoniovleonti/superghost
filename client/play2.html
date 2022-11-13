@@ -256,10 +256,12 @@ function populatePlayers(players) {
 }
 
 // 
-function appendToGameLog(status) {
-  newLI = document.createElement("li");
-  newLI.innerHTML = status;
-  logOL.appendChild(newLI);
+function appendToGameLog(logFlush) {
+  for (const lf of logFlush) {
+    newLI = document.createElement("li");
+    newLI.innerHTML = lf;
+    logOL.appendChild(newLI);
+  }
 }
 
 // Enable / disable & hide / show buttons according to whose turn it is.
@@ -311,7 +313,7 @@ function renderGameState(state) {
   updateButtons(nextPlayer == kMyUsername, state.awaiting);
   writeShortStatus(nextPlayer, state.lastPlayer, state.awaiting);
   writeStem(state.word);
-  appendToGameLog(state.lastRoundResult);
+  appendToGameLog(state.logFlush);
 }
 
 /***** BUTTON HANDLERS *****/

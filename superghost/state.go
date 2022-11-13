@@ -38,16 +38,18 @@ type state struct {
   lastPlayer string
   firstPlayer int
   lastRoundResult string
+  log []string
+  logItemsFlushed int
 }
 
 type jState struct { // publicly visible version of gamestate
-  Players []*Player       `json:"players"`
-  Word string             `json:"word"`
-  Awaiting string         `json:"awaiting"`
-  NextPlayer int          `json:"nextPlayer"`
-  LastPlayer string       `json:"lastPlayer"`
-  FirstPlayer int         `json:"firstPlayer"`
-  LastRoundResult string  `json:"lastRoundResult"`
+  Players []*Player `json:"players"`
+  Word string       `json:"word"`
+  Awaiting string   `json:"awaiting"`
+  NextPlayer int    `json:"nextPlayer"`
+  LastPlayer string `json:"lastPlayer"`
+  FirstPlayer int   `json:"firstPlayer"`
+  LogFlush []string `json:"logFlush"`
 }
 
 func (gs *state) MarshalJSON() ([]byte, error) {
@@ -61,7 +63,7 @@ func (gs *state) MarshalJSON() ([]byte, error) {
     NextPlayer: gs.nextPlayer,
     LastPlayer: gs.lastPlayer,
     FirstPlayer: gs.firstPlayer,
-    LastRoundResult: gs.lastRoundResult,
+    LogFlush: gs.log[gs.logItemsFlushed:],
   })
 }
 
@@ -70,9 +72,9 @@ func newState() *state {
   gs.players = make([]*Player, 0)
   gs.usernameToPlayer = make(map[string]*Player)
   gs.awaiting = kPlayers
-  gs.nextPlayer = 0
   gs.lastPlayer = ""
-  gs.firstPlayer = 0
+  gs.logItemsFlushed = 0
+  gs.log = make([]string, 0)
   return gs
 }
 
@@ -107,15 +109,19 @@ func (gs *state) AddPlayer(username string,
     return nil, fmt.Errorf("username '%s' already in use", username)
   }
 
+  gs.logItemsFlushed = len(gs.log)
+
   p := NewPlayer(username, path)
   gs.usernameToPlayer[username] = p
   gs.players = append(gs.players, p)
+
+  gs.log = append(gs.log, p.username + " joined the game!")
+
   if len(gs.players) >= 2 && gs.awaiting == kPlayers {
     gs.awaiting = kEdit
   }
   if len(gs.players) < 2 {
     gs.awaiting = kPlayers
-    gs.newRound("")
   }
   return p.cookie, nil
 }
@@ -134,27 +140,32 @@ func (gs *state) ChallengeIsWord(cookies []*http.Cookie, minLength int) error {
     return fmt.Errorf("minimum word length not met")
   }
 
+  gs.logItemsFlushed = len(gs.log)
+  gs.log = append(gs.log, fmt.Sprintf(
+      "%s challenged %s on the basis that '%s' is a word.",
+      gs.players[gs.nextPlayer].username, gs.lastPlayer, gs.stem))
+
   isWord, err := validateWord(gs.stem)
   if err != nil {
     return err
   }
   var loser string
-  var correctness string
+  var isOrIsNot string
   if isWord {
-    correctness = "correctly"
     loser = gs.lastPlayer
+    isOrIsNot = "IS"
     if p, ok := gs.usernameToPlayer[gs.lastPlayer]; ok {
       p.score++
     }
   } else {
-    correctness = "incorrectly"
+    isOrIsNot = "IS NOT"
     p := gs.players[gs.nextPlayer]
     p.score++
     loser = p.username
   }
-  gs.newRound(fmt.Sprintf("%s %s claimed %s spelled a word with '%s'; +1 %s",
-                          gs.players[gs.nextPlayer].username, correctness,
-                          gs.lastPlayer, gs.stem, loser))
+  gs.log = append(gs.log, fmt.Sprintf("'%s' %s a word! +1 %s.",
+                                      gs.stem, isOrIsNot, loser))
+  gs.newRound()
   return nil
 }
 
@@ -172,23 +183,33 @@ func (gs *state) ChallengeContinuation(cookies []*http.Cookie) error {
     return fmt.Errorf("cannot challenge empty stem")
   }
 
-  tmpNextPlayer := gs.nextPlayer
-  foundLastPlayer := false
+  gs.logItemsFlushed = len(gs.log)
+
   // make sure the challenged player hasn't left
+  lastPlayerIdx := -1
   for i, p := range gs.players {
     if p.username == gs.lastPlayer {
-      foundLastPlayer = true
-      gs.nextPlayer = i
+      lastPlayerIdx = i
+      break
     }
   }
-  if !foundLastPlayer {
-    lastRoundResult := fmt.Sprintf(
-        "%s challenged %s, who has left the game",
-        gs.lastPlayer, gs.players[gs.nextPlayer].username)
-    gs.newRound(lastRoundResult)
+  if lastPlayerIdx == -1 {
+    gs.log = append(gs.log, fmt.Sprintf(
+        "%s challenged %s, who left the game.",
+        gs.players[gs.nextPlayer].username, gs.lastPlayer))
+    gs.newRound()
+    return nil
   }
+  gs.log = append(gs.log, fmt.Sprintf(
+      "%s challenged %s for a continuation.",
+      gs.players[gs.nextPlayer].username, gs.lastPlayer))
 
-  gs.lastPlayer = gs.players[tmpNextPlayer % len(gs.players)].username
+  gs.lastPlayer = gs.players[gs.nextPlayer].username
+  if len(gs.players) == 0 {
+    gs.nextPlayer = 0
+  } else {
+    gs.nextPlayer = (gs.nextPlayer + 1) % len(gs.players)
+  }
   gs.awaiting = kRebut
   return nil
 }
@@ -212,6 +233,10 @@ func (gs *state) RebutChallenge(cookies []*http.Cookie,
     return fmt.Errorf("minimum word length not met")
   }
 
+  gs.logItemsFlushed = len(gs.log)
+  gs.log = append(gs.log, fmt.Sprintf("%s rebutted with the continuation '%s'.",
+                                      gs.players[gs.nextPlayer].username,
+                                      continuation))
   // check if it is a word
   isWord, err := validateWord(continuation)
   if err != nil {
@@ -219,23 +244,23 @@ func (gs *state) RebutChallenge(cookies []*http.Cookie,
   }
   // update game state accordingly
   var loser string
-  var success string
+  var isOrIsNot string
   if isWord && strings.Contains(continuation, gs.stem) {
     // challenger gets a letter
-    success = "successfully"
+    isOrIsNot = "IS"
     loser = gs.lastPlayer
     if p, ok := gs.usernameToPlayer[gs.lastPlayer]; ok {
       p.score++
     }
   } else {
-    success = "unsuccessfully"
+    isOrIsNot = "IS NOT"
     p := gs.players[gs.nextPlayer]
     p.score++
     loser = p.username
   }
-  gs.newRound(fmt.Sprintf("%s %s rebutted %s's challenge with '%s'; +1 %s",
-                          gs.players[gs.nextPlayer].username, success,
-                          gs.lastPlayer, continuation, loser))
+  gs.log = append(gs.log, fmt.Sprintf("'%s' %s a word! +1 %s.",
+                                      continuation, isOrIsNot, loser))
+  gs.newRound()
   return nil
 }
 
@@ -255,8 +280,20 @@ func (gs *state) AffixWord(
         "(received: {prefix: '%s', suffix: '%s'})", prefix, suffix)
   }
 
-
   gs.stem = prefix + gs.stem + suffix
+
+  gs.logItemsFlushed = len(gs.log)
+  // update log
+  var position string
+  if len(prefix) > 0 {
+    position = "beginning"
+  } else {
+    position = "end"
+  }
+  gs.log = append(gs.log, fmt.Sprintf(
+      "%s affixed %s to the %s of the stem for '%s'.",
+      gs.players[gs.nextPlayer].username, prefix + suffix, position, gs.stem))
+
   gs.lastPlayer = gs.players[gs.nextPlayer].username
   if len(gs.players) == 0 {
     gs.nextPlayer = 0  // Seems extremely unlikely but I'd rather be safe
@@ -288,8 +325,8 @@ func (gs *state) isInTurnCookie(cookie *http.Cookie) bool {
   return (p.username == cookie.Name) && (p.cookie.Value == cookie.Value)
 }
 
-
-func (gs *state) newRound(lastRoundResult string) {
+func (gs *state) newRound() {
+  gs.log = append(gs.log, "A new round started.")
   gs.stem = ""
   if len(gs.players) == 0 {
     gs.firstPlayer = 0
@@ -298,7 +335,6 @@ func (gs *state) newRound(lastRoundResult string) {
   }
   gs.lastPlayer = ""
   gs.nextPlayer = gs.firstPlayer
-  gs.lastRoundResult = lastRoundResult
   if len(gs.players) >= 2 {
     gs.awaiting = kEdit
   } else {
@@ -319,7 +355,7 @@ func (gs *state) RemoveDeadPlayers(duration time.Duration) bool {
     }
   }
   if didRemovePlayer && (len(gs.players) < 2) {
-    gs.newRound("")
+    gs.newRound()
   }
   return didRemovePlayer
 }
@@ -335,6 +371,7 @@ func (gs *state) removePlayer(index int) error {
     gs.firstPlayer--
   }
 
+  gs.log = append(gs.log, gs.players[index].username + " left the game.")
   delete(gs.usernameToPlayer, gs.players[index].username)
 
   if (index == len(gs.players) - 1) {
@@ -353,6 +390,8 @@ func (gs *state) Leave(cookies []*http.Cookie) error {
   if !ok {
     return fmt.Errorf("no credentials provided")
   }
+
+  gs.logItemsFlushed = len(gs.log)
 
   for i, p := range gs.players { // we have to find the index of the player
     if p.username == username {
@@ -396,26 +435,19 @@ func (gs *state) Concede(cookies []*http.Cookie) error {
       if len(gs.stem) == 0 {
         return fmt.Errorf("cannot concede when word is empty")
       }
-      gs.usernameToPlayer[username].score++
-      gs.newRound(fmt.Sprintf("%s conceded the round at '%s'; +1 %s",
-                              username, gs.stem, username))
 
     case kRebut:
       if (username != gs.lastPlayer &&
           username != gs.players[gs.nextPlayer].username) {
         return fmt.Errorf("it is not your turn")
       }
-      gs.usernameToPlayer[username].score++
-      if username == gs.lastPlayer {
-        gs.newRound(fmt.Sprintf(
-            "%s conceded the round after challenging %s at '%s'; +1 %s",
-            username, gs.players[gs.nextPlayer].username, gs.stem, username))
-        return nil
-      } // else
-      gs.newRound(fmt.Sprintf(
-          "%s conceded the round after being challenged by %s at '%s'; +1 %s",
-          username, gs.lastPlayer, gs.stem, username))
   }
+  gs.logItemsFlushed = len(gs.log)
+
+  gs.usernameToPlayer[username].score++
+  gs.log = append(gs.log, fmt.Sprintf("%s conceded the round. +1 %s",
+                                      username, username))
+  gs.newRound()
   return nil
 }
 
@@ -433,7 +465,13 @@ func (gs *state) Votekick(cookies []*http.Cookie, usernameToKick string) error {
     return fmt.Errorf("player not found");
   }
 
-  playerToKick.votekick(voter)
+  err := playerToKick.votekick(voter)
+  if err != nil {
+    return err
+  }
+
+  gs.logItemsFlushed = len(gs.log)
+  gs.log = append(gs.log, voter + " voted to kick " + usernameToKick + ".")
   // if a majority has voted to kick the player, remove them from the game
   if float64(playerToKick.numVotesToKick) >=
      float64(len(gs.players)) / 1.9 {

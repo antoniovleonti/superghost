@@ -3,6 +3,7 @@ package superghost
 import(
   "encoding/json"
   "net/http"
+  "fmt"
   "time"
 )
 
@@ -42,12 +43,15 @@ func NewPlayer(username string, path string) *Player {
   return p
 }
 
-func (p *Player) votekick(voterUsername string) {
+func (p *Player) votekick(voterUsername string) error {
   // username has already been validated
   hasAlreadyVoted, ok := p.whoVotedToKick[voterUsername]
   if !ok || !hasAlreadyVoted /* useful if votes can be revoked */ {
     p.whoVotedToKick[voterUsername] = true
     p.numVotesToKick++
+  } else {
+    return fmt.Errorf("you've already voted to kick this player")
   }
+  return nil
 }
 
