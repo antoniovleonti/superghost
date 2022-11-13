@@ -280,19 +280,18 @@ func (gs *state) AffixWord(
         "(received: {prefix: '%s', suffix: '%s'})", prefix, suffix)
   }
 
-  gs.stem = prefix + gs.stem + suffix
-
-  gs.logItemsFlushed = len(gs.log)
   // update log
-  var position string
+  gs.logItemsFlushed = len(gs.log)
+  var affixed string
   if len(prefix) > 0 {
-    position = "beginning"
+    affixed = prefix + "+" + gs.stem
   } else {
-    position = "end"
+    affixed = gs.stem + "+" + suffix
   }
   gs.log = append(gs.log, fmt.Sprintf(
-      "%s affixed %s to the %s of the stem for '%s'.",
-      gs.players[gs.nextPlayer].username, prefix + suffix, position, gs.stem))
+      "%s affixed %s.", gs.players[gs.nextPlayer].username, affixed))
+
+  gs.stem = prefix + gs.stem + suffix
 
   gs.lastPlayer = gs.players[gs.nextPlayer].username
   if len(gs.players) == 0 {
