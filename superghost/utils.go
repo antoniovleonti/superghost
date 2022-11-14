@@ -31,7 +31,6 @@ func newCookie(path string, username string) *http.Cookie {
   c.Value = GetRandBase64String(32)
   c.Expires = time.Now().Add(24 * time.Hour)
   c.Path = path
-  fmt.Println(c.String())
   return c
 }
 
