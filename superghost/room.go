@@ -36,6 +36,10 @@ func (r *Room) GetJsonGameState() ([]byte, error) {
   return json.Marshal(r.state)
 }
 
+func (r *Room) GetJsonGameStateFullLog() ([]byte, error) {
+  return r.state.GetJsonGameStateFullLog()
+}
+
 func (r *Room) GetValidCookie(cookies []*http.Cookie) (string, bool) {
   return r.state.GetValidCookie(cookies)
 }

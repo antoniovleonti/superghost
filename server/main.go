@@ -303,7 +303,7 @@ func (s *SuperghostServer) currentState(w http.ResponseWriter,
   }
   switch r.Method {
     case http.MethodGet:
-      b, err := roomWrapper.Room.GetJsonGameState()
+      b, err := roomWrapper.Room.GetJsonGameStateFullLog()
       if err != nil {
         panic ("couldn't marshal room state")
       }

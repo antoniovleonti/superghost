@@ -78,6 +78,20 @@ func newState() *state {
   return gs
 }
 
+func (gs *state) GetJsonGameStateFullLog() ([]byte, error) {
+  gs.mutex.RLock()
+  defer gs.mutex.RUnlock()
+
+  return json.Marshal(jState {
+    Players: gs.players,
+    Word: strings.ToUpper(gs.stem),
+    Awaiting: gs.awaiting.String(),
+    NextPlayer: gs.nextPlayer,
+    LastPlayer: gs.lastPlayer,
+    FirstPlayer: gs.firstPlayer,
+    LogFlush: gs.log,
+  })
+}
 // public, mutex-protected version
 func (gs *state) GetValidCookie(cookies []*http.Cookie) (string, bool) {
   gs.mutex.RLock()
