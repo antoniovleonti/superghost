@@ -274,7 +274,7 @@ func (gs *state) AffixWord(
   if _, ok := gs.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
   }
-  if !_affixPattern.MatchString(prefix + suffix) {
+  if !_alphaPattern.MatchString(prefix + suffix) {
     return fmt.Errorf(
         "exactly one alphabetical prefix OR suffix must be provided " +
         "(received: {prefix: '%s', suffix: '%s'})", prefix, suffix)
