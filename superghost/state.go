@@ -58,7 +58,7 @@ func (gs *state) MarshalJSON() ([]byte, error) {
 
   return json.Marshal(jState {
     Players: gs.players,
-    Word: gs.stem,
+    Word: strings.ToUpper(gs.stem),
     Awaiting: gs.awaiting.String(),
     NextPlayer: gs.nextPlayer,
     LastPlayer: gs.lastPlayer,
