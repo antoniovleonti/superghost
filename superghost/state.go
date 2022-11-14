@@ -115,7 +115,7 @@ func (gs *state) AddPlayer(username string,
   gs.usernameToPlayer[username] = p
   gs.players = append(gs.players, p)
 
-  gs.log = append(gs.log, p.username + " joined the game!")
+  gs.log = append(gs.log, fmt.Sprintf("<i>%s</i> joined the game!", p.username))
 
   if len(gs.players) >= 2 && gs.awaiting == kPlayers {
     gs.awaiting = kEdit
@@ -142,8 +142,9 @@ func (gs *state) ChallengeIsWord(cookies []*http.Cookie, minLength int) error {
 
   gs.logItemsFlushed = len(gs.log)
   gs.log = append(gs.log, fmt.Sprintf(
-      "%s challenged %s on the basis that '%s' is a word.",
-      gs.players[gs.nextPlayer].username, gs.lastPlayer, gs.stem))
+      "<i>%s</i> claimed <i>%s</i> spelled a word.",
+      gs.players[gs.nextPlayer].username, gs.lastPlayer,
+      strings.ToUpper(gs.stem)))
 
   isWord, err := validateWord(gs.stem)
   if err != nil {
@@ -163,8 +164,9 @@ func (gs *state) ChallengeIsWord(cookies []*http.Cookie, minLength int) error {
     p.score++
     loser = p.username
   }
-  gs.log = append(gs.log, fmt.Sprintf("'%s' %s a word! +1 %s.",
-                                      gs.stem, isOrIsNot, loser))
+  gs.log = append(gs.log, fmt.Sprintf("'%s' %s a word! +1 <i>%s</i>.",
+                                      strings.ToUpper(gs.stem), isOrIsNot,
+                                      loser))
   gs.newRound()
   return nil
 }
@@ -195,13 +197,13 @@ func (gs *state) ChallengeContinuation(cookies []*http.Cookie) error {
   }
   if lastPlayerIdx == -1 {
     gs.log = append(gs.log, fmt.Sprintf(
-        "%s challenged %s, who left the game.",
+        "<i>%s</i> challenged <i>%s</i>, who left the game.",
         gs.players[gs.nextPlayer].username, gs.lastPlayer))
     gs.newRound()
     return nil
   }
   gs.log = append(gs.log, fmt.Sprintf(
-      "%s challenged %s for a continuation.",
+      "<i>%s</i> challenged <i>%s</i> for a continuation.",
       gs.players[gs.nextPlayer].username, gs.lastPlayer))
 
   gs.lastPlayer = gs.players[gs.nextPlayer].username
@@ -228,13 +230,13 @@ func (gs *state) RebutChallenge(cookies []*http.Cookie,
     return fmt.Errorf("it is not your turn")
   }
 
-  continuation := prefix + gs.stem + suffix
+  continuation := strings.ToUpper(prefix + gs.stem + suffix)
   if len(continuation) < minLength {
     return fmt.Errorf("minimum word length not met")
   }
 
   gs.logItemsFlushed = len(gs.log)
-  gs.log = append(gs.log, fmt.Sprintf("%s rebutted with the continuation '%s'.",
+  gs.log = append(gs.log, fmt.Sprintf("<i>%s</i> rebutted with '%s'.",
                                       gs.players[gs.nextPlayer].username,
                                       continuation))
   // check if it is a word
@@ -258,7 +260,7 @@ func (gs *state) RebutChallenge(cookies []*http.Cookie,
     p.score++
     loser = p.username
   }
-  gs.log = append(gs.log, fmt.Sprintf("'%s' %s a word! +1 %s.",
+  gs.log = append(gs.log, fmt.Sprintf("'%s' %s a word! +1 <i>%s</i>.",
                                       continuation, isOrIsNot, loser))
   gs.newRound()
   return nil
@@ -284,12 +286,13 @@ func (gs *state) AffixWord(
   gs.logItemsFlushed = len(gs.log)
   var affixed string
   if len(prefix) > 0 {
-    affixed = prefix + "+" + gs.stem
+    affixed = "<b>" + prefix + "</b>" + gs.stem
   } else {
-    affixed = gs.stem + "+" + suffix
+    affixed = gs.stem + "<b>" + suffix + "</b>"
   }
   gs.log = append(gs.log, fmt.Sprintf(
-      "%s affixed %s.", gs.players[gs.nextPlayer].username, affixed))
+      "<i>%s</i>: %s",
+      gs.players[gs.nextPlayer].username, strings.ToUpper(affixed)))
 
   gs.stem = prefix + gs.stem + suffix
 
@@ -325,7 +328,6 @@ func (gs *state) isInTurnCookie(cookie *http.Cookie) bool {
 }
 
 func (gs *state) newRound() {
-  gs.log = append(gs.log, "A new round started.")
   gs.stem = ""
   if len(gs.players) == 0 {
     gs.firstPlayer = 0
@@ -370,7 +372,8 @@ func (gs *state) removePlayer(index int) error {
     gs.firstPlayer--
   }
 
-  gs.log = append(gs.log, gs.players[index].username + " left the game.")
+  gs.log = append(gs.log, fmt.Sprintf("<i>%s</i> left the game.",
+                                      gs.players[index].username))
   delete(gs.usernameToPlayer, gs.players[index].username)
 
   if (index == len(gs.players) - 1) {
@@ -444,8 +447,8 @@ func (gs *state) Concede(cookies []*http.Cookie) error {
   gs.logItemsFlushed = len(gs.log)
 
   gs.usernameToPlayer[username].score++
-  gs.log = append(gs.log, fmt.Sprintf("%s conceded the round. +1 %s",
-                                      username, username))
+  gs.log = append(gs.log, fmt.Sprintf(
+      "<i>%s</i> conceded the round. +1 <i>%s</i>", username, username))
   gs.newRound()
   return nil
 }
@@ -470,7 +473,8 @@ func (gs *state) Votekick(cookies []*http.Cookie, usernameToKick string) error {
   }
 
   gs.logItemsFlushed = len(gs.log)
-  gs.log = append(gs.log, voter + " voted to kick " + usernameToKick + ".")
+  gs.log = append(gs.log, fmt.Sprintf("<i>%s</i> voted to kick <i>%s</i>.",
+                                      voter, usernameToKick))
   // if a majority has voted to kick the player, remove them from the game
   if float64(playerToKick.numVotesToKick) >=
      float64(len(gs.players)) / 1.9 {
