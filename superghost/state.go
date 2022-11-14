@@ -245,7 +245,7 @@ func (gs *state) RebutChallenge(cookies []*http.Cookie,
   // update game state accordingly
   var loser string
   var isOrIsNot string
-  if isWord && strings.Contains(continuation, gs.stem) {
+  if isWord {
     // challenger gets a letter
     isOrIsNot = "IS"
     loser = gs.lastPlayer
