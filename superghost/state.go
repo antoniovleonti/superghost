@@ -183,12 +183,12 @@ func (gs *Room) ChallengeIsWord(cookies []*http.Cookie) error {
     loser = gs.lastPlayer
     isOrIsNot = "IS"
     if p, ok := gs.usernameToPlayer[gs.lastPlayer]; ok {
-      p.score++
+      p.incrementScore(0)
     }
   } else {
     isOrIsNot = "IS NOT"
     p := gs.players[gs.nextPlayer]
-    p.score++
+    p.incrementScore(0)
     loser = p.username
   }
   gs.log = append(gs.log, fmt.Sprintf("'%s' %s a word! +1 <i>%s</i>.",
@@ -278,12 +278,12 @@ func (gs *Room) RebutChallenge(cookies []*http.Cookie,
     isOrIsNot = "IS"
     loser = gs.lastPlayer
     if p, ok := gs.usernameToPlayer[gs.lastPlayer]; ok {
-      p.score++
+      p.incrementScore(0)
     }
   } else {
     isOrIsNot = "IS NOT"
     p := gs.players[gs.nextPlayer]
-    p.score++
+    p.incrementScore(0)
     loser = p.username
   }
   gs.log = append(gs.log, fmt.Sprintf("'%s' %s a word! +1 <i>%s</i>.",
@@ -472,7 +472,7 @@ func (gs *Room) Concede(cookies []*http.Cookie) error {
   }
   gs.logItemsFlushed = len(gs.log)
 
-  gs.usernameToPlayer[username].score++
+  gs.usernameToPlayer[username].incrementScore(0)
   gs.log = append(gs.log, fmt.Sprintf(
       "<i>%s</i> conceded the round. +1 <i>%s</i>", username, username))
   gs.newRound()

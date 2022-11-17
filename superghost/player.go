@@ -55,3 +55,7 @@ func (p *Player) votekick(voterUsername string) error {
   return nil
 }
 
+func (p *Player) incrementScore(eliminationThreshold int) {
+  p.score++
+}
+
