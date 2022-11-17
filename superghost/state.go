@@ -52,7 +52,7 @@ type Room struct {
 type jRoom struct { // publicly visible version of gamestate
   Players []*Player `json:"players"`
   Word string       `json:"word"`
-  Awaiting string   `json:"state"`
+  State string   `json:"state"`
   NextPlayer int    `json:"nextPlayer"`
   LastPlayer string `json:"lastPlayer"`
   FirstPlayer int   `json:"firstPlayer"`
@@ -66,7 +66,7 @@ func (gs *Room) MarshalJSON() ([]byte, error) {
   return json.Marshal(jRoom {
     Players: gs.players,
     Word: strings.ToUpper(gs.stem),
-    Awaiting: gs.state.String(),
+    State: gs.state.String(),
     NextPlayer: gs.nextPlayer,
     LastPlayer: gs.lastPlayer,
     FirstPlayer: gs.firstPlayer,
@@ -81,7 +81,7 @@ func (gs *Room) MarshalJSONFullLog() ([]byte, error) {
   return json.Marshal(jRoom {
     Players: gs.players,
     Word: strings.ToUpper(gs.stem),
-    Awaiting: gs.state.String(),
+    State: gs.state.String(),
     NextPlayer: gs.nextPlayer,
     LastPlayer: gs.lastPlayer,
     FirstPlayer: gs.firstPlayer,
