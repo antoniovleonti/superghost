@@ -18,10 +18,10 @@ type RoomWrapper struct {
 }
 
 func NewRoomWrapper(config superghost.Config) *RoomWrapper {
-  rh := new(RoomWrapper)
-  rh.Room = superghost.NewRoom(config)
-  rh.Listeners = make([]chan string, 0)
-  return rh
+  rw := new(RoomWrapper)
+  rw.Room = superghost.NewRoom(config)
+  rw.Listeners = make([]chan string, 0)
+  return rw
 }
 
 type SuperghostServer struct {
@@ -107,7 +107,7 @@ func (s *SuperghostServer) rooms(w http.ResponseWriter, r *http.Request) {
       roomID := superghost.GetRandBase32String(6)
       s.Rooms[roomID] = NewRoomWrapper(superghost.Config{
             MaxPlayers: maxPlayers,
-            MinWordLength: minWordLength,
+            MinStemLength: minWordLength,
             IsPublic: isPublic,
           })
       redirectURIList(w, []string{"/rooms/" + roomID + "/join"})
@@ -303,7 +303,7 @@ func (s *SuperghostServer) currentState(w http.ResponseWriter,
   }
   switch r.Method {
     case http.MethodGet:
-      b, err := roomWrapper.Room.GetJsonGameStateFullLog()
+      b, err := roomWrapper.Room.MarshalJSONFullLog()
       if err != nil {
         panic ("couldn't marshal room state")
       }
@@ -432,7 +432,7 @@ func (rw *RoomWrapper) BroadcastGameState() {
   rw.ListenersMutex.Lock()
   defer rw.ListenersMutex.Unlock()
 
-  b, err := rw.Room.GetJsonGameState()
+  b, err := rw.Room.MarshalJSON()
   if err != nil {
     panic("couldn't get json room state") // something's gone terribly wrong
   }
@@ -444,21 +444,11 @@ func (rw *RoomWrapper) BroadcastGameState() {
   rw.Listeners = make([]chan string, 0) // clear
 }
 
-// func (s *SuperghostServer) intermittentlyRemoveDeadPlayers() {
-  //for _ = range time.Tick(time.Second) {
-    //go func () {
-      //if roomWrapper.Room.RemoveDeadPlayers(10 * time.Minute) {
-        //roomWrapper.BroadcastGameState()
-      //}
-    //}()
-  //}
-//}
-
 func main() {
   server := NewSuperghostServer()
   server.Rooms["test-room"] = NewRoomWrapper(superghost.Config{
         MaxPlayers: 5,
-        MinWordLength: 5,
+        MinStemLength: 5,
         IsPublic: true,
       })
 

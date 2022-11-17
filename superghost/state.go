@@ -28,7 +28,14 @@ func (p Blocker) String() string {
   }
 }
 
-type state struct {
+type Config struct {
+  MaxPlayers int
+  MinStemLength int
+  IsPublic bool
+}
+
+type Room struct {
+  config *Config
   mutex sync.RWMutex
   players []*Player
   usernameToPlayer map[string]*Player
@@ -42,7 +49,7 @@ type state struct {
   logItemsFlushed int
 }
 
-type jState struct { // publicly visible version of gamestate
+type jRoom struct { // publicly visible version of gamestate
   Players []*Player `json:"players"`
   Word string       `json:"word"`
   Awaiting string   `json:"awaiting"`
@@ -52,11 +59,11 @@ type jState struct { // publicly visible version of gamestate
   LogFlush []string `json:"logFlush"`
 }
 
-func (gs *state) MarshalJSON() ([]byte, error) {
+func (gs *Room) MarshalJSON() ([]byte, error) {
   gs.mutex.RLock()
   defer gs.mutex.RUnlock()
 
-  return json.Marshal(jState {
+  return json.Marshal(jRoom {
     Players: gs.players,
     Word: strings.ToUpper(gs.stem),
     Awaiting: gs.awaiting.String(),
@@ -67,22 +74,11 @@ func (gs *state) MarshalJSON() ([]byte, error) {
   })
 }
 
-func newState() *state {
-  gs := new(state)
-  gs.players = make([]*Player, 0)
-  gs.usernameToPlayer = make(map[string]*Player)
-  gs.awaiting = kPlayers
-  gs.lastPlayer = ""
-  gs.logItemsFlushed = 0
-  gs.log = make([]string, 0)
-  return gs
-}
-
-func (gs *state) GetJsonGameStateFullLog() ([]byte, error) {
+func (gs *Room) MarshalJSONFullLog() ([]byte, error) {
   gs.mutex.RLock()
   defer gs.mutex.RUnlock()
 
-  return json.Marshal(jState {
+  return json.Marshal(jRoom {
     Players: gs.players,
     Word: strings.ToUpper(gs.stem),
     Awaiting: gs.awaiting.String(),
@@ -92,13 +88,32 @@ func (gs *state) GetJsonGameStateFullLog() ([]byte, error) {
     LogFlush: gs.log,
   })
 }
+
+func NewRoom(config Config) *Room {
+  gs := new(Room)
+
+  gs.config = new(Config)
+  gs.config.MaxPlayers = config.MaxPlayers
+  gs.config.MinStemLength = config.MinStemLength
+  gs.config.IsPublic = config.IsPublic
+
+  gs.players = make([]*Player, 0)
+  gs.usernameToPlayer = make(map[string]*Player)
+  gs.awaiting = kPlayers
+  gs.lastPlayer = ""
+  gs.logItemsFlushed = 0
+  gs.log = make([]string, 0)
+  return gs
+}
+
 // public, mutex-protected version
-func (gs *state) GetValidCookie(cookies []*http.Cookie) (string, bool) {
+func (gs *Room) GetValidCookie(cookies []*http.Cookie) (string, bool) {
   gs.mutex.RLock()
   defer gs.mutex.RUnlock()
   return gs.getValidCookie(cookies)
 }
-func (gs *state) getValidCookie(cookies []*http.Cookie) (string, bool) {
+
+func (gs *Room) getValidCookie(cookies []*http.Cookie) (string, bool) {
   for _, cookie := range cookies {
     if gs.isValidCookie(cookie) {
       return cookie.Name, true
@@ -107,13 +122,11 @@ func (gs *state) getValidCookie(cookies []*http.Cookie) (string, bool) {
   return "", false
 }
 
-func (gs *state) AddPlayer(username string,
-                           path string,
-                           maxPlayers int) (*http.Cookie, error) {
+func (gs *Room) AddPlayer(username string, path string) (*http.Cookie, error) {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
-  if len(gs.players) >= maxPlayers {
+  if len(gs.players) >= gs.config.MaxPlayers {
     return nil, fmt.Errorf("player limit reached")
   }
   if !_usernamePattern.MatchString(username) {
@@ -140,7 +153,7 @@ func (gs *state) AddPlayer(username string,
   return p.cookie, nil
 }
 
-func (gs *state) ChallengeIsWord(cookies []*http.Cookie, minLength int) error {
+func (gs *Room) ChallengeIsWord(cookies []*http.Cookie) error {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
@@ -150,7 +163,7 @@ func (gs *state) ChallengeIsWord(cookies []*http.Cookie, minLength int) error {
   if gs.awaiting != kEdit {
     return fmt.Errorf("cannot challenge right now")
   }
-  if len(gs.stem) < minLength {
+  if len(gs.stem) < gs.config.MinStemLength {
     return fmt.Errorf("minimum word length not met")
   }
 
@@ -185,7 +198,7 @@ func (gs *state) ChallengeIsWord(cookies []*http.Cookie, minLength int) error {
   return nil
 }
 
-func (gs *state) ChallengeContinuation(cookies []*http.Cookie) error {
+func (gs *Room) ChallengeContinuation(cookies []*http.Cookie) error {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
@@ -230,10 +243,9 @@ func (gs *state) ChallengeContinuation(cookies []*http.Cookie) error {
   return nil
 }
 
-func (gs *state) RebutChallenge(cookies []*http.Cookie,
+func (gs *Room) RebutChallenge(cookies []*http.Cookie,
                                 prefix string,
-                                suffix string,
-                                minLength int) error {
+                                suffix string) error {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
@@ -245,7 +257,7 @@ func (gs *state) RebutChallenge(cookies []*http.Cookie,
   }
 
   continuation := strings.ToUpper(prefix + gs.stem + suffix)
-  if len(continuation) < minLength {
+  if len(continuation) < gs.config.MinStemLength {
     return fmt.Errorf("minimum word length not met")
   }
 
@@ -258,7 +270,7 @@ func (gs *state) RebutChallenge(cookies []*http.Cookie,
   if err != nil {
     return err
   }
-  // update game state accordingly
+  // update game Room accordingly
   var loser string
   var isOrIsNot string
   if isWord {
@@ -280,7 +292,7 @@ func (gs *state) RebutChallenge(cookies []*http.Cookie,
   return nil
 }
 
-func (gs *state) AffixWord(
+func (gs *Room) AffixWord(
     cookies []*http.Cookie, prefix string, suffix string) error {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
@@ -319,14 +331,14 @@ func (gs *state) AffixWord(
   return nil
 }
 
-func (gs *state) isValidCookie(cookie *http.Cookie) bool {
+func (gs *Room) isValidCookie(cookie *http.Cookie) bool {
   if _, ok := gs.usernameToPlayer[cookie.Name]; !ok {
     return false
   }
   return gs.usernameToPlayer[cookie.Name].cookie.Value == cookie.Value
 }
 
-func (gs *state) getInTurnCookie(cookies []*http.Cookie) (
+func (gs *Room) getInTurnCookie(cookies []*http.Cookie) (
     *http.Cookie, bool) {
   for _, cookie := range cookies {
     if gs.isInTurnCookie(cookie) {
@@ -336,12 +348,12 @@ func (gs *state) getInTurnCookie(cookies []*http.Cookie) (
   return nil, false
 }
 
-func (gs *state) isInTurnCookie(cookie *http.Cookie) bool {
+func (gs *Room) isInTurnCookie(cookie *http.Cookie) bool {
   p := gs.players[gs.nextPlayer % len(gs.players)]
   return (p.username == cookie.Name) && (p.cookie.Value == cookie.Value)
 }
 
-func (gs *state) newRound() {
+func (gs *Room) newRound() {
   gs.stem = ""
   if len(gs.players) == 0 {
     gs.firstPlayer = 0
@@ -358,7 +370,7 @@ func (gs *state) newRound() {
 }
 
 // returns true if any players are removed, false otherwise
-func (gs *state) RemoveDeadPlayers(duration time.Duration) bool {
+func (gs *Room) RemoveDeadPlayers(duration time.Duration) bool {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
@@ -375,7 +387,7 @@ func (gs *state) RemoveDeadPlayers(duration time.Duration) bool {
   return didRemovePlayer
 }
 
-func (gs *state) removePlayer(index int) error {
+func (gs *Room) removePlayer(index int) error {
   if index > len(gs.players) {
     return fmt.Errorf("index out of bounds")
   }
@@ -398,7 +410,7 @@ func (gs *state) removePlayer(index int) error {
   return nil
 }
 
-func (gs *state) Leave(cookies []*http.Cookie) error {
+func (gs *Room) Leave(cookies []*http.Cookie) error {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
@@ -417,7 +429,7 @@ func (gs *state) Leave(cookies []*http.Cookie) error {
   return fmt.Errorf("unexpected error: player not found")
 }
 
-func (gs *state) Heartbeat(cookies []*http.Cookie) error {
+func (gs *Room) Heartbeat(cookies []*http.Cookie) error {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
@@ -434,7 +446,7 @@ func (gs *state) Heartbeat(cookies []*http.Cookie) error {
   return nil
 }
 
-func (gs *state) Concede(cookies []*http.Cookie) error {
+func (gs *Room) Concede(cookies []*http.Cookie) error {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
@@ -467,7 +479,7 @@ func (gs *state) Concede(cookies []*http.Cookie) error {
   return nil
 }
 
-func (gs *state) Votekick(cookies []*http.Cookie, usernameToKick string) error {
+func (gs *Room) Votekick(cookies []*http.Cookie, usernameToKick string) error {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
