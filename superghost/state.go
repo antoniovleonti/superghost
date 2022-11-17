@@ -9,22 +9,22 @@ import (
   "time"
 )
 
-type Blocker int
+type State int
 const (
-  kEdit Blocker = iota
+  kEdit State = iota
   kRebut
-  kPlayers
+  kInsufficientPlayers
 )
-func (p Blocker) String() string {
+func (p State) String() string {
   switch p {
     case kEdit:
       return "edit"
     case kRebut:
       return "rebut"
-    case kPlayers:
+    case kInsufficientPlayers:
       return "insufficient players"
     default:
-      panic("invalid Blocker value")
+      panic("invalid State value")
   }
 }
 
@@ -40,7 +40,7 @@ type Room struct {
   players []*Player
   usernameToPlayer map[string]*Player
   stem string
-  awaiting Blocker
+  state State
   nextPlayer int
   lastPlayer string
   firstPlayer int
@@ -52,7 +52,7 @@ type Room struct {
 type jRoom struct { // publicly visible version of gamestate
   Players []*Player `json:"players"`
   Word string       `json:"word"`
-  Awaiting string   `json:"awaiting"`
+  Awaiting string   `json:"state"`
   NextPlayer int    `json:"nextPlayer"`
   LastPlayer string `json:"lastPlayer"`
   FirstPlayer int   `json:"firstPlayer"`
@@ -66,7 +66,7 @@ func (gs *Room) MarshalJSON() ([]byte, error) {
   return json.Marshal(jRoom {
     Players: gs.players,
     Word: strings.ToUpper(gs.stem),
-    Awaiting: gs.awaiting.String(),
+    Awaiting: gs.state.String(),
     NextPlayer: gs.nextPlayer,
     LastPlayer: gs.lastPlayer,
     FirstPlayer: gs.firstPlayer,
@@ -81,7 +81,7 @@ func (gs *Room) MarshalJSONFullLog() ([]byte, error) {
   return json.Marshal(jRoom {
     Players: gs.players,
     Word: strings.ToUpper(gs.stem),
-    Awaiting: gs.awaiting.String(),
+    Awaiting: gs.state.String(),
     NextPlayer: gs.nextPlayer,
     LastPlayer: gs.lastPlayer,
     FirstPlayer: gs.firstPlayer,
@@ -99,7 +99,7 @@ func NewRoom(config Config) *Room {
 
   gs.players = make([]*Player, 0)
   gs.usernameToPlayer = make(map[string]*Player)
-  gs.awaiting = kPlayers
+  gs.state = kInsufficientPlayers
   gs.lastPlayer = ""
   gs.logItemsFlushed = 0
   gs.log = make([]string, 0)
@@ -144,11 +144,11 @@ func (gs *Room) AddPlayer(username string, path string) (*http.Cookie, error) {
 
   gs.log = append(gs.log, fmt.Sprintf("<i>%s</i> joined the game!", p.username))
 
-  if len(gs.players) >= 2 && gs.awaiting == kPlayers {
-    gs.awaiting = kEdit
+  if len(gs.players) >= 2 && gs.state == kInsufficientPlayers {
+    gs.state = kEdit
   }
   if len(gs.players) < 2 {
-    gs.awaiting = kPlayers
+    gs.state = kInsufficientPlayers
   }
   return p.cookie, nil
 }
@@ -160,7 +160,7 @@ func (gs *Room) ChallengeIsWord(cookies []*http.Cookie) error {
   if _, ok := gs.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
   }
-  if gs.awaiting != kEdit {
+  if gs.state != kEdit {
     return fmt.Errorf("cannot challenge right now")
   }
   if len(gs.stem) < gs.config.MinStemLength {
@@ -205,7 +205,7 @@ func (gs *Room) ChallengeContinuation(cookies []*http.Cookie) error {
   if _, ok := gs.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
   }
-  if gs.awaiting != kEdit {
+  if gs.state != kEdit {
     return fmt.Errorf("cannot challenge right now")
   }
   if len(gs.stem) < 1 {
@@ -239,7 +239,7 @@ func (gs *Room) ChallengeContinuation(cookies []*http.Cookie) error {
   } else {
     gs.nextPlayer = (gs.nextPlayer + 1) % len(gs.players)
   }
-  gs.awaiting = kRebut
+  gs.state = kRebut
   return nil
 }
 
@@ -249,7 +249,7 @@ func (gs *Room) RebutChallenge(cookies []*http.Cookie,
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
 
-  if gs.awaiting != kRebut {
+  if gs.state != kRebut {
     return fmt.Errorf("cannot rebut right now")
   }
   if _, ok := gs.getInTurnCookie(cookies); !ok {
@@ -296,7 +296,7 @@ func (gs *Room) AffixWord(
     cookies []*http.Cookie, prefix string, suffix string) error {
   gs.mutex.Lock()
   defer gs.mutex.Unlock()
-  if gs.awaiting != kEdit {
+  if gs.state != kEdit {
     return fmt.Errorf("cannot affix right now")
   }
   if _, ok := gs.getInTurnCookie(cookies); !ok {
@@ -363,9 +363,9 @@ func (gs *Room) newRound() {
   gs.lastPlayer = ""
   gs.nextPlayer = gs.firstPlayer
   if len(gs.players) >= 2 {
-    gs.awaiting = kEdit
+    gs.state = kEdit
   } else {
-    gs.awaiting = kPlayers
+    gs.state = kInsufficientPlayers
   }
 }
 
@@ -454,9 +454,9 @@ func (gs *Room) Concede(cookies []*http.Cookie) error {
   if !ok {
     return fmt.Errorf("no credentials provided")
   }
-  switch gs.awaiting {
+  switch gs.state {
 
-    case kPlayers:
+    case kInsufficientPlayers:
       return fmt.Errorf("cannot concede right now")
 
     case kEdit:

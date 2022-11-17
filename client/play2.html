@@ -268,26 +268,26 @@ function appendToGameLog(logFlush) {
 }
 
 // Enable / disable & hide / show buttons according to whose turn it is.
-function updateButtons(isMyTurn, awaiting) {
+function updateButtons(isMyTurn, state) {
   // Hide one, show the other
-  affixForm.style.display = awaiting != "rebut" ? 'block' : 'none';
-  rebutForm.style.display = awaiting == "rebut" ? 'block' : 'none';
+  affixForm.style.display = state != "rebut" ? 'block' : 'none';
+  rebutForm.style.display = state == "rebut" ? 'block' : 'none';
 
   for (const f of [affixForm, rebutForm]) {
     for (const e of f.elements) {
-      e.disabled = !isMyTurn || awaiting == "insufficient players";
+      e.disabled = !isMyTurn || state == "insufficient players";
     }
   }
   challengeContButton.disabled = challengeIsWordButton.disabled =
-      !(awaiting == "edit" && isMyTurn);
-  concedeButton.disabled = awaiting == "insufficient players";
+      !(state == "edit" && isMyTurn);
+  concedeButton.disabled = state == "insufficient players";
 }
 
 // Write a short sentence describing the state of the game to the screen.
-function writeShortStatus(nextPlayer, lastPlayer, awaiting) {
+function writeShortStatus(nextPlayer, lastPlayer, state) {
   let nextOrYour = nextPlayer == kMyUsername ? "your" : nextPlayer + "'s";
   let lastOrYour = lastPlayer == kMyUsername ? "your" : lastPlayer + "'s";
-  switch (awaiting) {
+  switch (state) {
     case "edit":
       shortStatus.innerHTML = "It is " + nextOrYour + " turn to add a letter.";
       break;
@@ -314,8 +314,8 @@ function writeStem(stem) {
 function renderGameState(state) {
   let nextPlayer = state.players[state.nextPlayer].username;
   populatePlayers(state.players);
-  updateButtons(nextPlayer == kMyUsername, state.awaiting);
-  writeShortStatus(nextPlayer, state.lastPlayer, state.awaiting);
+  updateButtons(nextPlayer == kMyUsername, state.state);
+  writeShortStatus(nextPlayer, state.lastPlayer, state.state);
   writeStem(state.word);
   appendToGameLog(state.logFlush);
 }
