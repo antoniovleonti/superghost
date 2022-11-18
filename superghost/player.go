@@ -14,6 +14,7 @@ type Player struct {
   numVotesToKick uint
   whoVotedToKick map[string]bool
   lastHeartbeat time.Time
+  isEliminated bool
 }
 
 type JPlayer struct {

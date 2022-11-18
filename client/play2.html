@@ -312,12 +312,12 @@ function writeStem(stem) {
 }
 
 function renderGameState(state) {
-  let nextPlayer = state.players[state.nextPlayer].username;
+  let nextPlayer = state.players[state.currentPlayerIdx].username;
   populatePlayers(state.players);
   updateButtons(nextPlayer == kMyUsername, state.state);
-  writeShortStatus(nextPlayer, state.lastPlayer, state.state);
-  writeStem(state.word);
-  appendToGameLog(state.logFlush);
+  writeShortStatus(nextPlayer, state.lastPlayerUsername, state.state);
+  writeStem(state.stem);
+  appendToGameLog(state.logPush);
 }
 
 /***** BUTTON HANDLERS *****/

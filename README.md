@@ -3,6 +3,7 @@
 # Todo:
 - [ ] Elimination
 - [ ] Remove long idle games
+- [ ] Share room config with client
 - [ ] Chat
 - [ ] Keep game log at bottom
 - [ ] Join page
