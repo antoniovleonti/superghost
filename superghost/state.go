@@ -178,8 +178,8 @@ func (r *Room) ChallengeIsWord(cookies []*http.Cookie) error {
     loser = p.username
   }
   r.log = append(r.log, fmt.Sprintf("'%s' %s a word! +1 <i>%s</i>.",
-                                      strings.ToUpper(r.stem), isOrIsNot,
-                                      loser))
+                                    strings.ToUpper(r.stem), isOrIsNot,
+                                    loser))
   r.newRound()
   return nil
 }
@@ -230,8 +230,8 @@ func (r *Room) ChallengeContinuation(cookies []*http.Cookie) error {
 }
 
 func (r *Room) RebutChallenge(cookies []*http.Cookie,
-                               prefix string,
-                               suffix string) error {
+                              prefix string,
+                              suffix string) error {
   r.mutex.Lock()
   defer r.mutex.Unlock()
 
@@ -248,9 +248,9 @@ func (r *Room) RebutChallenge(cookies []*http.Cookie,
   }
 
   r.logItemsPushed = len(r.log)
-  r.log = append(r.log, fmt.Sprintf("<i>%s</i> rebutted with '%s'.",
-                                      r.pm.players[r.pm.currentPlayerIdx].username,
-                                      continuation))
+  r.log = append(r.log, fmt.Sprintf(
+      "<i>%s</i> rebutted with '%s'.",
+      r.pm.players[r.pm.currentPlayerIdx].username, continuation))
   // check if it is a word
   isWord, err := validateWord(continuation)
   if err != nil {
@@ -273,7 +273,7 @@ func (r *Room) RebutChallenge(cookies []*http.Cookie,
     loser = p.username
   }
   r.log = append(r.log, fmt.Sprintf("'%s' %s a word! +1 <i>%s</i>.",
-                                      continuation, isOrIsNot, loser))
+                                    continuation, isOrIsNot, loser))
   r.newRound()
   return nil
 }
@@ -380,7 +380,7 @@ func (r *Room) Concede(cookies []*http.Cookie) error {
 }
 
 func (r *Room) Votekick(cookies []*http.Cookie,
-                         kickRecipientUsername string) error {
+                        kickRecipientUsername string) error {
   r.mutex.Lock()
   defer r.mutex.Unlock()
 
@@ -401,7 +401,7 @@ func (r *Room) Votekick(cookies []*http.Cookie,
 
   r.logItemsPushed = len(r.log)
   r.log = append(r.log, fmt.Sprintf("<i>%s</i> voted to kick <i>%s</i>.",
-                                      voterUsername, kickRecipientUsername))
+                                    voterUsername, kickRecipientUsername))
   // if a majority has voted to kick the player, remove them from the game
   if float64(kickRecipient.numVotesToKick) >= float64(len(r.pm.players)) / 1.9 {
     if err := r.pm.removePlayer(kickRecipientUsername); err != nil {
