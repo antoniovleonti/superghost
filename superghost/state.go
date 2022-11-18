@@ -42,6 +42,7 @@ type Room struct {
   usernameToPlayer map[string]*Player
 
   currentPlayerIdx int
+  currentPlayerUsername string
   lastPlayerUsername string
   startingPlayerIdx int
 
@@ -312,17 +313,12 @@ func (gs *Room) AffixWord(
 
   // update log
   gs.logItemsPushed = len(gs.log)
-  var affixed string
-  if len(prefix) > 0 {
-    affixed = "<b>" + prefix + "</b>" + gs.stem
-  } else {
-    affixed = gs.stem + "<b>" + suffix + "</b>"
-  }
   gs.log = append(gs.log, fmt.Sprintf(
-      "<i>%s</i>: %s",
-      gs.players[gs.currentPlayerIdx].username, strings.ToUpper(affixed)))
+      "<i>%s</i>: <b>%s</b>%s<b>%s</b>",
+      gs.players[gs.currentPlayerIdx].username,
+      strings.ToUpper(prefix), gs.stem, strings.ToUpper(suffix)))
 
-  gs.stem = prefix + gs.stem + suffix
+  gs.stem = strings.ToUpper(prefix + gs.stem + suffix)
 
   gs.lastPlayerUsername = gs.players[gs.currentPlayerIdx].username
   if len(gs.players) == 0 {
