@@ -6,7 +6,6 @@ import (
   "net/http"
   "strings"
   "sync"
-  "time"
 )
 
 type State int
@@ -38,13 +37,7 @@ type Room struct {
   config *Config
   mutex sync.RWMutex
 
-  players []*Player
-  usernameToPlayer map[string]*Player
-
-  currentPlayerIdx int
-  currentPlayerUsername string
-  lastPlayerUsername string
-  startingPlayerIdx int
+  pm *PlayersManager
 
   stem string
   state State
@@ -63,210 +56,200 @@ type jRoom struct { // publicly visible version of gamestate
   LogPush []string `json:"logPush"`
 }
 
-func (gs *Room) MarshalJSON() ([]byte, error) {
-  gs.mutex.RLock()
-  defer gs.mutex.RUnlock()
+func (r *Room) MarshalJSON() ([]byte, error) {
+  r.mutex.RLock()
+  defer r.mutex.RUnlock()
 
   return json.Marshal(jRoom {
-    Players: gs.players,
-    Stem: strings.ToUpper(gs.stem),
-    State: gs.state.String(),
-    CurrentPlayerIdx: gs.currentPlayerIdx,
-    LastPlayerUsername: gs.lastPlayerUsername,
-    StartingPlayerIdx: gs.startingPlayerIdx,
-    LogPush: gs.log[gs.logItemsPushed:],
+    Players: r.pm.players,
+    Stem: strings.ToUpper(r.stem),
+    State: r.state.String(),
+    CurrentPlayerIdx: r.pm.currentPlayerIdx,
+    LastPlayerUsername: r.pm.lastPlayerUsername,
+    StartingPlayerIdx: r.pm.startingPlayerIdx,
+    LogPush: r.log[r.logItemsPushed:],
   })
 }
 
-func (gs *Room) MarshalJSONFullLog() ([]byte, error) {
-  gs.mutex.RLock()
-  defer gs.mutex.RUnlock()
+func (r *Room) MarshalJSONFullLog() ([]byte, error) {
+  r.mutex.RLock()
+  defer r.mutex.RUnlock()
 
   return json.Marshal(jRoom {
-    Players: gs.players,
-    Stem: strings.ToUpper(gs.stem),
-    State: gs.state.String(),
-    CurrentPlayerIdx: gs.currentPlayerIdx,
-    LastPlayerUsername: gs.lastPlayerUsername,
-    StartingPlayerIdx: gs.startingPlayerIdx,
-    LogPush: gs.log,
+    Players: r.pm.players,
+    Stem: strings.ToUpper(r.stem),
+    State: r.state.String(),
+    CurrentPlayerIdx: r.pm.currentPlayerIdx,
+    LastPlayerUsername: r.pm.lastPlayerUsername,
+    StartingPlayerIdx: r.pm.startingPlayerIdx,
+    LogPush: r.log,
   })
 }
 
 func NewRoom(config Config) *Room {
-  gs := new(Room)
+  r := new(Room)
 
-  gs.config = new(Config)
-  gs.config.MaxPlayers = config.MaxPlayers
-  gs.config.MinStemLength = config.MinStemLength
-  gs.config.IsPublic = config.IsPublic
+  r.config = new(Config)
+  r.config.MaxPlayers = config.MaxPlayers
+  r.config.MinStemLength = config.MinStemLength
+  r.config.IsPublic = config.IsPublic
 
-  gs.players = make([]*Player, 0)
-  gs.usernameToPlayer = make(map[string]*Player)
-  gs.state = kInsufficientPlayers
-  gs.lastPlayerUsername = ""
-  gs.logItemsPushed = 0
-  gs.log = make([]string, 0)
-  return gs
+  r.pm = newPlayersManager()
+  r.state = kInsufficientPlayers
+  r.logItemsPushed = 0
+  r.log = make([]string, 0)
+  return r
 }
 
 // public, mutex-protected version
-func (gs *Room) GetValidCookie(cookies []*http.Cookie) (string, bool) {
-  gs.mutex.RLock()
-  defer gs.mutex.RUnlock()
-  return gs.getValidCookie(cookies)
+func (r *Room) GetValidCookie(cookies []*http.Cookie) (string, bool) {
+  r.mutex.RLock()
+  defer r.mutex.RUnlock()
+  return r.pm.getValidCookie(cookies)
 }
 
-func (gs *Room) getValidCookie(cookies []*http.Cookie) (string, bool) {
-  for _, cookie := range cookies {
-    if gs.isValidCookie(cookie) {
-      return cookie.Name, true
-    }
-  }
-  return "", false
-}
 
-func (gs *Room) AddPlayer(username string, path string) (*http.Cookie, error) {
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
+func (r *Room) AddPlayer(username string, path string) (*http.Cookie, error) {
+  r.mutex.Lock()
+  defer r.mutex.Unlock()
 
-  if len(gs.players) >= gs.config.MaxPlayers {
+  if len(r.pm.players) >= r.config.MaxPlayers {
     return nil, fmt.Errorf("player limit reached")
   }
   if !_usernamePattern.MatchString(username) {
     return nil, fmt.Errorf("username must be alphanumeric")
   }
-  if _, ok := gs.usernameToPlayer[username]; ok {
+  if _, ok := r.pm.usernameToPlayer[username]; ok {
     return nil, fmt.Errorf("username '%s' already in use", username)
   }
 
-  gs.logItemsPushed = len(gs.log)
+  r.logItemsPushed = len(r.log)
 
   p := NewPlayer(username, path)
-  gs.usernameToPlayer[username] = p
-  gs.players = append(gs.players, p)
+  r.pm.usernameToPlayer[username] = p
+  r.pm.players = append(r.pm.players, p)
 
-  gs.log = append(gs.log, fmt.Sprintf("<i>%s</i> joined the game!", p.username))
+  r.log = append(r.log, fmt.Sprintf("<i>%s</i> joined the game!", p.username))
 
-  if len(gs.players) >= 2 && gs.state == kInsufficientPlayers {
-    gs.state = kEdit
+  if len(r.pm.players) >= 2 && r.state == kInsufficientPlayers {
+    r.state = kEdit
   }
-  if len(gs.players) < 2 {
-    gs.state = kInsufficientPlayers
+  if len(r.pm.players) < 2 {
+    r.state = kInsufficientPlayers
   }
   return p.cookie, nil
 }
 
-func (gs *Room) ChallengeIsWord(cookies []*http.Cookie) error {
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
+func (r *Room) ChallengeIsWord(cookies []*http.Cookie) error {
+  r.mutex.Lock()
+  defer r.mutex.Unlock()
 
-  if _, ok := gs.getInTurnCookie(cookies); !ok {
+  if _, ok := r.pm.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
   }
-  if gs.state != kEdit {
+  if r.state != kEdit {
     return fmt.Errorf("cannot challenge right now")
   }
-  if len(gs.stem) < gs.config.MinStemLength {
+  if len(r.stem) < r.config.MinStemLength {
     return fmt.Errorf("minimum word length not met")
   }
 
-  gs.logItemsPushed = len(gs.log)
-  gs.log = append(gs.log, fmt.Sprintf(
+  r.logItemsPushed = len(r.log)
+  r.log = append(r.log, fmt.Sprintf(
       "<i>%s</i> claimed <i>%s</i> spelled a word.",
-      gs.players[gs.currentPlayerIdx].username, gs.lastPlayerUsername))
+      r.pm.players[r.pm.currentPlayerIdx].username, r.pm.lastPlayerUsername))
 
-  isWord, err := validateWord(gs.stem)
+  isWord, err := validateWord(r.stem)
   if err != nil {
     return err
   }
   var loser string
   var isOrIsNot string
   if isWord {
-    loser = gs.lastPlayerUsername
+    loser = r.pm.lastPlayerUsername
     isOrIsNot = "IS"
-    if p, ok := gs.usernameToPlayer[gs.lastPlayerUsername]; ok {
+    if p, ok := r.pm.usernameToPlayer[r.pm.lastPlayerUsername]; ok {
       p.incrementScore(0)
     }
   } else {
     isOrIsNot = "IS NOT"
-    p := gs.players[gs.currentPlayerIdx]
+    p := r.pm.players[r.pm.currentPlayerIdx]
     p.incrementScore(0)
     loser = p.username
   }
-  gs.log = append(gs.log, fmt.Sprintf("'%s' %s a word! +1 <i>%s</i>.",
-                                      strings.ToUpper(gs.stem), isOrIsNot,
+  r.log = append(r.log, fmt.Sprintf("'%s' %s a word! +1 <i>%s</i>.",
+                                      strings.ToUpper(r.stem), isOrIsNot,
                                       loser))
-  gs.newRound()
+  r.newRound()
   return nil
 }
 
-func (gs *Room) ChallengeContinuation(cookies []*http.Cookie) error {
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
+func (r *Room) ChallengeContinuation(cookies []*http.Cookie) error {
+  r.mutex.Lock()
+  defer r.mutex.Unlock()
 
-  if _, ok := gs.getInTurnCookie(cookies); !ok {
+  if _, ok := r.pm.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
   }
-  if gs.state != kEdit {
+  if r.state != kEdit {
     return fmt.Errorf("cannot challenge right now")
   }
-  if len(gs.stem) < 1 {
+  if len(r.stem) < 1 {
     return fmt.Errorf("cannot challenge empty stem")
   }
 
-  gs.logItemsPushed = len(gs.log)
+  r.logItemsPushed = len(r.log)
 
   // make sure the challenged player hasn't left
   lastPlayerUsernameIdx := -1
-  for i, p := range gs.players {
-    if p.username == gs.lastPlayerUsername {
+  for i, p := range r.pm.players {
+    if p.username == r.pm.lastPlayerUsername {
       lastPlayerUsernameIdx = i
       break
     }
   }
   if lastPlayerUsernameIdx == -1 {
-    gs.log = append(gs.log, fmt.Sprintf(
+    r.log = append(r.log, fmt.Sprintf(
         "<i>%s</i> challenged <i>%s</i>, who left the game.",
-        gs.players[gs.currentPlayerIdx].username, gs.lastPlayerUsername))
-    gs.newRound()
+        r.pm.players[r.pm.currentPlayerIdx].username, r.pm.lastPlayerUsername))
+    r.newRound()
     return nil
   }
-  gs.log = append(gs.log, fmt.Sprintf(
+  r.log = append(r.log, fmt.Sprintf(
       "<i>%s</i> challenged <i>%s</i> for a continuation.",
-      gs.players[gs.currentPlayerIdx].username, gs.lastPlayerUsername))
+      r.pm.players[r.pm.currentPlayerIdx].username, r.pm.lastPlayerUsername))
 
-  gs.lastPlayerUsername = gs.players[gs.currentPlayerIdx].username
-  if len(gs.players) == 0 {
-    gs.currentPlayerIdx = 0
+  r.pm.lastPlayerUsername = r.pm.players[r.pm.currentPlayerIdx].username
+  if len(r.pm.players) == 0 {
+    r.pm.currentPlayerIdx = 0
   } else {
-    gs.currentPlayerIdx = (gs.currentPlayerIdx + 1) % len(gs.players)
+    r.pm.currentPlayerIdx = (r.pm.currentPlayerIdx + 1) % len(r.pm.players)
   }
-  gs.state = kRebut
+  r.state = kRebut
   return nil
 }
 
-func (gs *Room) RebutChallenge(cookies []*http.Cookie,
+func (r *Room) RebutChallenge(cookies []*http.Cookie,
                                prefix string,
                                suffix string) error {
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
+  r.mutex.Lock()
+  defer r.mutex.Unlock()
 
-  if gs.state != kRebut {
+  if r.state != kRebut {
     return fmt.Errorf("cannot rebut right now")
   }
-  if _, ok := gs.getInTurnCookie(cookies); !ok {
+  if _, ok := r.pm.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
   }
 
-  continuation := strings.ToUpper(prefix + gs.stem + suffix)
-  if len(continuation) < gs.config.MinStemLength {
+  continuation := strings.ToUpper(prefix + r.stem + suffix)
+  if len(continuation) < r.config.MinStemLength {
     return fmt.Errorf("minimum word length not met")
   }
 
-  gs.logItemsPushed = len(gs.log)
-  gs.log = append(gs.log, fmt.Sprintf("<i>%s</i> rebutted with '%s'.",
-                                      gs.players[gs.currentPlayerIdx].username,
+  r.logItemsPushed = len(r.log)
+  r.log = append(r.log, fmt.Sprintf("<i>%s</i> rebutted with '%s'.",
+                                      r.pm.players[r.pm.currentPlayerIdx].username,
                                       continuation))
   // check if it is a word
   isWord, err := validateWord(continuation)
@@ -279,30 +262,30 @@ func (gs *Room) RebutChallenge(cookies []*http.Cookie,
   if isWord {
     // challenger gets a letter
     isOrIsNot = "IS"
-    loser = gs.lastPlayerUsername
-    if p, ok := gs.usernameToPlayer[gs.lastPlayerUsername]; ok {
+    loser = r.pm.lastPlayerUsername
+    if p, ok := r.pm.usernameToPlayer[r.pm.lastPlayerUsername]; ok {
       p.incrementScore(0)
     }
   } else {
     isOrIsNot = "IS NOT"
-    p := gs.players[gs.currentPlayerIdx]
+    p := r.pm.players[r.pm.currentPlayerIdx]
     p.incrementScore(0)
     loser = p.username
   }
-  gs.log = append(gs.log, fmt.Sprintf("'%s' %s a word! +1 <i>%s</i>.",
+  r.log = append(r.log, fmt.Sprintf("'%s' %s a word! +1 <i>%s</i>.",
                                       continuation, isOrIsNot, loser))
-  gs.newRound()
+  r.newRound()
   return nil
 }
 
-func (gs *Room) AffixWord(
+func (r *Room) AffixWord(
     cookies []*http.Cookie, prefix string, suffix string) error {
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
-  if gs.state != kEdit {
+  r.mutex.Lock()
+  defer r.mutex.Unlock()
+  if r.state != kEdit {
     return fmt.Errorf("cannot affix right now")
   }
-  if _, ok := gs.getInTurnCookie(cookies); !ok {
+  if _, ok := r.pm.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
   }
   if !_alphaPattern.MatchString(prefix + suffix) {
@@ -312,182 +295,101 @@ func (gs *Room) AffixWord(
   }
 
   // update log
-  gs.logItemsPushed = len(gs.log)
-  gs.log = append(gs.log, fmt.Sprintf(
+  r.logItemsPushed = len(r.log)
+  r.log = append(r.log, fmt.Sprintf(
       "<i>%s</i>: <b>%s</b>%s<b>%s</b>",
-      gs.players[gs.currentPlayerIdx].username,
-      strings.ToUpper(prefix), gs.stem, strings.ToUpper(suffix)))
+      r.pm.players[r.pm.currentPlayerIdx].username,
+      strings.ToUpper(prefix), r.stem, strings.ToUpper(suffix)))
 
-  gs.stem = strings.ToUpper(prefix + gs.stem + suffix)
+  r.stem = strings.ToUpper(prefix + r.stem + suffix)
 
-  gs.lastPlayerUsername = gs.players[gs.currentPlayerIdx].username
-  if len(gs.players) == 0 {
-    gs.currentPlayerIdx = 0  // Seems extremely unlikely but I'd rather be safe
+  r.pm.lastPlayerUsername = r.pm.players[r.pm.currentPlayerIdx].username
+  if len(r.pm.players) == 0 {
+    r.pm.currentPlayerIdx = 0  // Seems extremely unlikely but I'd rather be safe
   } else {
-    gs.currentPlayerIdx = (gs.currentPlayerIdx + 1) % len(gs.players)
+    r.pm.currentPlayerIdx = (r.pm.currentPlayerIdx + 1) % len(r.pm.players)
   }
   return nil
 }
 
-func (gs *Room) isValidCookie(cookie *http.Cookie) bool {
-  if _, ok := gs.usernameToPlayer[cookie.Name]; !ok {
-    return false
-  }
-  return gs.usernameToPlayer[cookie.Name].cookie.Value == cookie.Value
-}
-
-func (gs *Room) getInTurnCookie(cookies []*http.Cookie) (
-    *http.Cookie, bool) {
-  for _, cookie := range cookies {
-    if gs.isInTurnCookie(cookie) {
-      return cookie, true
-    }
-  }
-  return nil, false
-}
-
-func (gs *Room) isInTurnCookie(cookie *http.Cookie) bool {
-  p := gs.players[gs.currentPlayerIdx % len(gs.players)]
-  return (p.username == cookie.Name) && (p.cookie.Value == cookie.Value)
-}
-
-func (gs *Room) newRound() {
-  gs.stem = ""
-  if len(gs.players) == 0 {
-    gs.startingPlayerIdx = 0
+func (r *Room) newRound() {
+  r.stem = ""
+  if len(r.pm.players) == 0 {
+    r.pm.startingPlayerIdx = 0
   } else {
-    gs.startingPlayerIdx = (gs.startingPlayerIdx + 1) % len(gs.players)
+    r.pm.startingPlayerIdx = (r.pm.startingPlayerIdx + 1) % len(r.pm.players)
   }
-  gs.lastPlayerUsername = ""
-  gs.currentPlayerIdx = gs.startingPlayerIdx
-  if len(gs.players) >= 2 {
-    gs.state = kEdit
+  r.pm.lastPlayerUsername = ""
+  r.pm.currentPlayerIdx = r.pm.startingPlayerIdx
+  if len(r.pm.players) >= 2 {
+    r.state = kEdit
   } else {
-    gs.state = kInsufficientPlayers
+    r.state = kInsufficientPlayers
   }
 }
 
-// returns true if any players are removed, false otherwise
-func (gs *Room) RemoveDeadPlayers(duration time.Duration) bool {
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
+func (r *Room) Leave(cookies []*http.Cookie) error {
+  r.mutex.Lock()
+  defer r.mutex.Unlock()
 
-  didRemovePlayer := false
-  for i := len(gs.players) - 1; i >= 0; i-- {
-    if time.Since(gs.players[i].lastHeartbeat) > duration {
-      gs.removePlayer(i)
-      didRemovePlayer = true
-    }
-  }
-  if didRemovePlayer && (len(gs.players) < 2) {
-    gs.newRound()
-  }
-  return didRemovePlayer
-}
-
-func (gs *Room) removePlayer(index int) error {
-  if index > len(gs.players) {
-    return fmt.Errorf("index out of bounds")
-  }
-  if index < gs.currentPlayerIdx {
-    gs.currentPlayerIdx--
-  }
-  if index < gs.startingPlayerIdx {
-    gs.startingPlayerIdx--
+  username, ok := r.pm.getValidCookie(cookies)
+  if !ok {
+    return fmt.Errorf("no credentials provided")
   }
 
-  gs.log = append(gs.log, fmt.Sprintf("<i>%s</i> left the game.",
-                                      gs.players[index].username))
-  delete(gs.usernameToPlayer, gs.players[index].username)
+  r.logItemsPushed = len(r.log)
 
-  if (index == len(gs.players) - 1) {
-    gs.players = gs.players[:index] // avoid out of bounds...
-  } else {
-    gs.players = append(gs.players[:index], gs.players[index+1:]...)
+  if err := r.pm.removePlayer(username); err != nil {
+    return err
   }
+  r.log = append(r.log, fmt.Sprintf("<i>%s</i> left the game.", username))
   return nil
 }
 
-func (gs *Room) Leave(cookies []*http.Cookie) error {
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
+func (r *Room) Concede(cookies []*http.Cookie) error {
+  r.mutex.Lock()
+  defer r.mutex.Unlock()
 
-  username, ok := gs.getValidCookie(cookies)
+  username, ok := r.pm.getValidCookie(cookies)
   if !ok {
     return fmt.Errorf("no credentials provided")
   }
-
-  gs.logItemsPushed = len(gs.log)
-
-  for i, p := range gs.players { // we have to find the index of the player
-    if p.username == username {
-      return gs.removePlayer(i)
-    }
-  }
-  return fmt.Errorf("unexpected error: player not found")
-}
-
-func (gs *Room) Heartbeat(cookies []*http.Cookie) error {
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
-
-  username, ok := gs.getValidCookie(cookies) // needs mutex
-  if !ok {
-    return fmt.Errorf("no credentials provided")
-  }
-
-  p, ok := gs.usernameToPlayer[username]
-  if !ok {
-    return fmt.Errorf("player does not exist")
-  }
-  p.heartbeat()
-  return nil
-}
-
-func (gs *Room) Concede(cookies []*http.Cookie) error {
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
-
-  username, ok := gs.getValidCookie(cookies)
-  if !ok {
-    return fmt.Errorf("no credentials provided")
-  }
-  switch gs.state {
+  switch r.state {
 
     case kInsufficientPlayers:
       return fmt.Errorf("cannot concede right now")
 
     case kEdit:
-      if len(gs.stem) == 0 {
+      if len(r.stem) == 0 {
         return fmt.Errorf("cannot concede when word is empty")
       }
 
     case kRebut:
-      if (username != gs.lastPlayerUsername &&
-          username != gs.players[gs.currentPlayerIdx].username) {
+      if (username != r.pm.lastPlayerUsername &&
+          username != r.pm.players[r.pm.currentPlayerIdx].username) {
         return fmt.Errorf("it is not your turn")
       }
   }
-  gs.logItemsPushed = len(gs.log)
+  r.logItemsPushed = len(r.log)
 
-  gs.usernameToPlayer[username].incrementScore(0)
-  gs.log = append(gs.log, fmt.Sprintf(
+  r.pm.usernameToPlayer[username].incrementScore(0)
+  r.log = append(r.log, fmt.Sprintf(
       "<i>%s</i> conceded the round. +1 <i>%s</i>", username, username))
-  gs.newRound()
+  r.newRound()
   return nil
 }
 
-func (gs *Room) Votekick(cookies []*http.Cookie,
+func (r *Room) Votekick(cookies []*http.Cookie,
                          kickRecipientUsername string) error {
-  gs.mutex.Lock()
-  defer gs.mutex.Unlock()
+  r.mutex.Lock()
+  defer r.mutex.Unlock()
 
-  voterUsername, ok := gs.getValidCookie(cookies)
+  voterUsername, ok := r.pm.getValidCookie(cookies)
   if !ok {
     return fmt.Errorf("no credentials provided")
   }
 
-  kickRecipient, ok := gs.usernameToPlayer[kickRecipientUsername]
+  kickRecipient, ok := r.pm.usernameToPlayer[kickRecipientUsername]
   if !ok {
     return fmt.Errorf("player not found");
   }
@@ -497,18 +399,16 @@ func (gs *Room) Votekick(cookies []*http.Cookie,
     return err
   }
 
-  gs.logItemsPushed = len(gs.log)
-  gs.log = append(gs.log, fmt.Sprintf("<i>%s</i> voted to kick <i>%s</i>.",
+  r.logItemsPushed = len(r.log)
+  r.log = append(r.log, fmt.Sprintf("<i>%s</i> voted to kick <i>%s</i>.",
                                       voterUsername, kickRecipientUsername))
   // if a majority has voted to kick the player, remove them from the game
-  if float64(kickRecipient.numVotesToKick) >= float64(len(gs.players)) / 1.9 {
-    for i, p := range gs.players {
-      if p.username == kickRecipientUsername {
-        gs.removePlayer(i)
-        break
-      }
+  if float64(kickRecipient.numVotesToKick) >= float64(len(r.pm.players)) / 1.9 {
+    if err := r.pm.removePlayer(kickRecipientUsername); err != nil {
+      return err
     }
+    r.log = append(r.log, fmt.Sprintf("<i>%s</i> left the game.",
+                                      kickRecipientUsername))
   }
   return nil
 }
-

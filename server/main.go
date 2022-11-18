@@ -335,31 +335,7 @@ func (s *SuperghostServer) nextState(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-func (s *SuperghostServer) heartbeat(w http.ResponseWriter, r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
-  switch r.Method {
-
-    case http.MethodPost:
-      err := roomWrapper.Room.Heartbeat(r.Cookies())
-      if err != nil {
-        // they got kicked from the room & came back most likely
-        http.Error(w, "couldn't find player", http.StatusNotFound)
-        return
-      }
-      fmt.Fprint(w, "success")
-
-    default:
-      http.Error(w, "", http.StatusMethodNotAllowed)
-  }
-}
-
-func (s *SuperghostServer) concession(w http.ResponseWriter,
-                                        r *http.Request) {
+func (s *SuperghostServer) concession(w http.ResponseWriter, r *http.Request) {
   roomID := chi.URLParam(r, "roomID")
   roomWrapper, ok := s.Rooms[roomID]
   if !ok {
