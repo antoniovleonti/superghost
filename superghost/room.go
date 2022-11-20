@@ -397,7 +397,7 @@ func (r *Room) Votekick(cookies []*http.Cookie,
     if err := r.pm.removePlayer(kickRecipientUsername); err != nil {
       return err
     }
-    r.log = append(r.log, fmt.Sprintf("<i>%s</i> left the game.",
+    r.log = append(r.log, fmt.Sprintf("<i>%s</i> was kicked from the game.",
                                       kickRecipientUsername))
   }
   return nil
