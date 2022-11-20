@@ -219,12 +219,7 @@ func (r *Room) ChallengeContinuation(cookies []*http.Cookie) error {
       "<i>%s</i> challenged <i>%s</i> for a continuation.",
       r.pm.players[r.pm.currentPlayerIdx].username, r.pm.lastPlayerUsername))
 
-  r.pm.lastPlayerUsername = r.pm.players[r.pm.currentPlayerIdx].username
-  if len(r.pm.players) == 0 {
-    r.pm.currentPlayerIdx = 0
-  } else {
-    r.pm.currentPlayerIdx = (r.pm.currentPlayerIdx + 1) % len(r.pm.players)
-  }
+  r.pm.incrementCurrentPlayer()
   r.state = kRebut
   return nil
 }
