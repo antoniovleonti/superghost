@@ -37,7 +37,7 @@ type Room struct {
   config *Config
   mutex sync.RWMutex
 
-  pm *PlayersManager
+  pm *playerManager
 
   stem string
   state State
@@ -94,7 +94,7 @@ func NewRoom(config Config) *Room {
   r.config.MinStemLength = config.MinStemLength
   r.config.IsPublic = config.IsPublic
 
-  r.pm = newPlayersManager()
+  r.pm = newPlayerManager()
   r.state = kInsufficientPlayers
   r.logItemsPushed = 0
   r.log = make([]string, 0)
@@ -303,23 +303,13 @@ func (r *Room) AffixWord(
 
   r.stem = strings.ToUpper(prefix + r.stem + suffix)
 
-  r.pm.lastPlayerUsername = r.pm.players[r.pm.currentPlayerIdx].username
-  if len(r.pm.players) == 0 {
-    r.pm.currentPlayerIdx = 0  // Seems extremely unlikely but I'd rather be safe
-  } else {
-    r.pm.currentPlayerIdx = (r.pm.currentPlayerIdx + 1) % len(r.pm.players)
-  }
+  r.pm.incrementCurrentPlayer()
   return nil
 }
 
 func (r *Room) newRound() {
   r.stem = ""
-  if len(r.pm.players) == 0 {
-    r.pm.startingPlayerIdx = 0
-  } else {
-    r.pm.startingPlayerIdx = (r.pm.startingPlayerIdx + 1) % len(r.pm.players)
-  }
-  r.pm.lastPlayerUsername = ""
+  r.pm.incrementCurrentPlayer()
   r.pm.currentPlayerIdx = r.pm.startingPlayerIdx
   if len(r.pm.players) >= 2 {
     r.state = kEdit

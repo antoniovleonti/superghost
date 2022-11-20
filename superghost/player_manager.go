@@ -5,7 +5,7 @@ import (
   "net/http"
 )
 
-type PlayersManager struct {
+type playerManager struct {
   players []*Player
   usernameToPlayer map[string]*Player
 
@@ -16,14 +16,14 @@ type PlayersManager struct {
   startingPlayerIdx int
 }
 
-func newPlayersManager() *PlayersManager {
-  pm := new(PlayersManager)
+func newPlayerManager() *playerManager {
+  pm := new(playerManager)
   pm.players = make([]*Player, 0)
   pm.usernameToPlayer = make(map[string]*Player)
   return pm
 }
 
-func (pm *PlayersManager) AddPlayer(username string, path string) (*http.Cookie, error) {
+func (pm *playerManager) addPlayer(username string, path string) (*http.Cookie, error) {
   if !_usernamePattern.MatchString(username) {
     return nil, fmt.Errorf("username must be alphanumeric")
   }
@@ -37,7 +37,7 @@ func (pm *PlayersManager) AddPlayer(username string, path string) (*http.Cookie,
   return p.cookie, nil
 }
 
-func (pm *PlayersManager) removePlayer(username string) error {
+func (pm *playerManager) removePlayer(username string) error {
   for i, p := range pm.players {
     if p.username == username {
       return pm.removePlayerByIdx(i)
@@ -47,7 +47,7 @@ func (pm *PlayersManager) removePlayer(username string) error {
   return fmt.Errorf("player not found")
 }
 
-func (pm *PlayersManager) removePlayerByIdx(index int) error {
+func (pm *playerManager) removePlayerByIdx(index int) error {
   if index > len(pm.players) {
     return fmt.Errorf("index out of bounds")
   }
@@ -68,7 +68,7 @@ func (pm *PlayersManager) removePlayerByIdx(index int) error {
   return nil
 }
 
-func (pm *PlayersManager) getValidCookie(cookies []*http.Cookie) (string, bool) {
+func (pm *playerManager) getValidCookie(cookies []*http.Cookie) (string, bool) {
   for _, cookie := range cookies {
     if pm.isValidCookie(cookie) {
       return cookie.Name, true
@@ -77,7 +77,7 @@ func (pm *PlayersManager) getValidCookie(cookies []*http.Cookie) (string, bool) 
   return "", false
 }
 
-func (pm *PlayersManager) getInTurnCookie(
+func (pm *playerManager) getInTurnCookie(
     cookies []*http.Cookie) (*http.Cookie, bool) {
   for _, cookie := range cookies {
     if pm.isInTurnCookie(cookie) {
@@ -87,16 +87,51 @@ func (pm *PlayersManager) getInTurnCookie(
   return nil, false
 }
 
-func (pm *PlayersManager) isInTurnCookie(cookie *http.Cookie) bool {
+func (pm *playerManager) isInTurnCookie(cookie *http.Cookie) bool {
   p := pm.players[pm.currentPlayerIdx % len(pm.players)]
   return (p.username == cookie.Name) && (p.cookie.Value == cookie.Value)
 }
 
-func (pm *PlayersManager) isValidCookie(cookie *http.Cookie) bool {
+func (pm *playerManager) isValidCookie(cookie *http.Cookie) bool {
 
   player, ok := pm.usernameToPlayer[cookie.Name]
   if !ok {
     return false
   }
   return player.cookie.Value == cookie.Value
+}
+
+func (pm *playerManager) incrementCurrentPlayer() (ok bool) {
+  if len(pm.players) == 0 {
+    pm.currentPlayerIdx = 0  // Seems extremely unlikely but I'd rather be safe
+    return false
+  }
+  for i := pm.currentPlayerIdx + 1;
+      i != pm.currentPlayerIdx;
+      i = (i + 1) % len(pm.players) {
+    if !pm.players[i].isEliminated {
+      pm.lastPlayerUsername = pm.players[pm.currentPlayerIdx].username
+      pm.currentPlayerIdx = i
+      return true
+    }
+  }
+  // Couldn't find a valid player (strange)
+  return false
+}
+
+func (pm *playerManager) incrementStartingPlayer() (ok bool) {
+  if len(pm.players) == 0 {
+    return false
+  }
+  for i := (pm.startingPlayerIdx + 1) % len(pm.players);
+      i != pm.startingPlayerIdx;
+      i = (i + 1) % len(pm.players) {
+    if !pm.players[i].isEliminated {
+      pm.lastPlayerUsername = ""
+      pm.startingPlayerIdx = i
+      return true
+    }
+  }
+  // Couldn't find a valid player (strange)
+  return false
 }
