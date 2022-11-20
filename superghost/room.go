@@ -304,7 +304,12 @@ func (r *Room) AffixWord(
 
 func (r *Room) newRound() {
   r.stem = ""
-  r.pm.incrementCurrentPlayer()
+  ok := r.pm.incrementStartingPlayer()
+  if !ok {
+    // Game has ended
+    // Enter "game over" mode
+    return
+  }
   r.pm.currentPlayerIdx = r.pm.startingPlayerIdx
   if len(r.pm.players) >= 2 {
     r.state = kEdit
