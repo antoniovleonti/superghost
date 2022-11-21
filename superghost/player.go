@@ -21,6 +21,7 @@ type JPlayer struct {
   Username string `json:"username"`
   Score uint        `json:"score"`
   NumVotesToKick uint `json:"numVotesToKick"`
+  IsEliminated bool `json:"isEliminated"`
 }
 
 func (p *Player) MarshalJSON() ([]byte, error) {
@@ -28,6 +29,7 @@ func (p *Player) MarshalJSON() ([]byte, error) {
     Username: p.username,
     Score: p.score,
     NumVotesToKick: p.numVotesToKick,
+    IsEliminated: p.isEliminated,
   })
 }
 
@@ -56,7 +58,11 @@ func (p *Player) votekick(voterUsername string) error {
   return nil
 }
 
-func (p *Player) incrementScore(eliminationThreshold int) {
+func (p *Player) incrementScore(eliminationThreshold int) (isEliminated bool) {
   p.score++
+  if eliminationThreshold > 0 && int(p.score) > eliminationThreshold {
+    p.isEliminated = true
+  }
+  return p.isEliminated
 }
 

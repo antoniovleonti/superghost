@@ -31,6 +31,7 @@ type Config struct {
   MaxPlayers int
   MinStemLength int
   IsPublic bool
+  EliminationThreshold int
 }
 
 type Room struct {
@@ -42,8 +43,7 @@ type Room struct {
   stem string
   state State
 
-  log []string
-  logItemsPushed int  // The number of log items already sent to clients
+  log *BufferedLog
 }
 
 type jRoom struct { // publicly visible version of gamestate
@@ -67,7 +67,7 @@ func (r *Room) MarshalJSON() ([]byte, error) {
     CurrentPlayerIdx: r.pm.currentPlayerIdx,
     LastPlayerUsername: r.pm.lastPlayerUsername,
     StartingPlayerIdx: r.pm.startingPlayerIdx,
-    LogPush: r.log[r.logItemsPushed:],
+    LogPush: r.log.history[r.log.itemsPushed:],
   })
 }
 
@@ -82,7 +82,7 @@ func (r *Room) MarshalJSONFullLog() ([]byte, error) {
     CurrentPlayerIdx: r.pm.currentPlayerIdx,
     LastPlayerUsername: r.pm.lastPlayerUsername,
     StartingPlayerIdx: r.pm.startingPlayerIdx,
-    LogPush: r.log,
+    LogPush: r.log.history,
   })
 }
 
@@ -96,8 +96,7 @@ func NewRoom(config Config) *Room {
 
   r.pm = newPlayerManager()
   r.state = kInsufficientPlayers
-  r.logItemsPushed = 0
-  r.log = make([]string, 0)
+  r.log = newBufferedLog()
   return r
 }
 
@@ -123,13 +122,13 @@ func (r *Room) AddPlayer(username string, path string) (*http.Cookie, error) {
     return nil, fmt.Errorf("username '%s' already in use", username)
   }
 
-  r.logItemsPushed = len(r.log)
+  r.log.flush()
 
   p := NewPlayer(username, path)
   r.pm.usernameToPlayer[username] = p
   r.pm.players = append(r.pm.players, p)
 
-  r.log = append(r.log, fmt.Sprintf("<i>%s</i> joined the game!", p.username))
+  r.log.appendJoin(username)
 
   if len(r.pm.players) >= 2 && r.state == kInsufficientPlayers {
     r.state = kEdit
@@ -154,32 +153,26 @@ func (r *Room) ChallengeIsWord(cookies []*http.Cookie) error {
     return fmt.Errorf("minimum word length not met")
   }
 
-  r.logItemsPushed = len(r.log)
-  r.log = append(r.log, fmt.Sprintf(
-      "<i>%s</i> claimed <i>%s</i> spelled a word.",
-      r.pm.players[r.pm.currentPlayerIdx].username, r.pm.lastPlayerUsername))
+  r.log.flush()
+  r.log.appendChallengeIsWord(r.pm.currentPlayerUsername(),
+                              r.pm.lastPlayerUsername)
 
   isWord, err := validateWord(r.stem)
   if err != nil {
     return err
   }
   var loser string
-  var isOrIsNot string
   if isWord {
     loser = r.pm.lastPlayerUsername
-    isOrIsNot = "IS"
     if p, ok := r.pm.usernameToPlayer[r.pm.lastPlayerUsername]; ok {
-      p.incrementScore(0)
+      p.incrementScore(r.config.EliminationThreshold)
     }
   } else {
-    isOrIsNot = "IS NOT"
     p := r.pm.players[r.pm.currentPlayerIdx]
-    p.incrementScore(0)
+    p.incrementScore(r.config.EliminationThreshold)
     loser = p.username
   }
-  r.log = append(r.log, fmt.Sprintf("'%s' %s a word! +1 <i>%s</i>.",
-                                    strings.ToUpper(r.stem), isOrIsNot,
-                                    loser))
+  r.log.appendChallengeResult(strings.ToUpper(r.stem), isWord, loser)
   r.newRound()
   return nil
 }
@@ -198,28 +191,16 @@ func (r *Room) ChallengeContinuation(cookies []*http.Cookie) error {
     return fmt.Errorf("cannot challenge empty stem")
   }
 
-  r.logItemsPushed = len(r.log)
+  r.log.flush()
 
-  // make sure the challenged player hasn't left
-  lastPlayerUsernameIdx := -1
-  for i, p := range r.pm.players {
-    if p.username == r.pm.lastPlayerUsername {
-      lastPlayerUsernameIdx = i
-      break
-    }
-  }
-  if lastPlayerUsernameIdx == -1 {
-    r.log = append(r.log, fmt.Sprintf(
-        "<i>%s</i> challenged <i>%s</i>, who left the game.",
-        r.pm.players[r.pm.currentPlayerIdx].username, r.pm.lastPlayerUsername))
+  if !r.pm.swapCurrentAndLastPlayers() {
+    r.log.appendChallengedPlayerLeft(r.pm.currentPlayerUsername(),
+                                     r.pm.lastPlayerUsername)
     r.newRound()
     return nil
   }
-  r.log = append(r.log, fmt.Sprintf(
-      "<i>%s</i> challenged <i>%s</i> for a continuation.",
-      r.pm.players[r.pm.currentPlayerIdx].username, r.pm.lastPlayerUsername))
-
-  r.pm.incrementCurrentPlayer()
+  r.log.appendChallengeContinuation(r.pm.currentPlayerUsername(),
+                                    r.pm.lastPlayerUsername)
   r.state = kRebut
   return nil
 }
@@ -242,10 +223,8 @@ func (r *Room) RebutChallenge(cookies []*http.Cookie,
     return fmt.Errorf("minimum word length not met")
   }
 
-  r.logItemsPushed = len(r.log)
-  r.log = append(r.log, fmt.Sprintf(
-      "<i>%s</i> rebutted with '%s'.",
-      r.pm.players[r.pm.currentPlayerIdx].username, continuation))
+  r.log.flush()
+  r.log.appendRebuttal(r.pm.currentPlayerUsername(), continuation)
   // check if it is a word
   isWord, err := validateWord(continuation)
   if err != nil {
@@ -253,22 +232,18 @@ func (r *Room) RebutChallenge(cookies []*http.Cookie,
   }
   // update game Room accordingly
   var loser string
-  var isOrIsNot string
   if isWord {
     // challenger gets a letter
-    isOrIsNot = "IS"
     loser = r.pm.lastPlayerUsername
     if p, ok := r.pm.usernameToPlayer[r.pm.lastPlayerUsername]; ok {
-      p.incrementScore(0)
+      p.incrementScore(r.config.EliminationThreshold)
     }
   } else {
-    isOrIsNot = "IS NOT"
     p := r.pm.players[r.pm.currentPlayerIdx]
-    p.incrementScore(0)
+    p.incrementScore(r.config.EliminationThreshold)
     loser = p.username
   }
-  r.log = append(r.log, fmt.Sprintf("'%s' %s a word! +1 <i>%s</i>.",
-                                    continuation, isOrIsNot, loser))
+  r.log.appendChallengeResult(continuation, isWord, loser)
   r.newRound()
   return nil
 }
@@ -290,11 +265,8 @@ func (r *Room) AffixWord(
   }
 
   // update log
-  r.logItemsPushed = len(r.log)
-  r.log = append(r.log, fmt.Sprintf(
-      "<i>%s</i>: <b>%s</b>%s<b>%s</b>",
-      r.pm.players[r.pm.currentPlayerIdx].username,
-      strings.ToUpper(prefix), r.stem, strings.ToUpper(suffix)))
+  r.log.flush()
+  r.log.appendAffixation(r.pm.currentPlayerUsername(), prefix, r.stem, suffix)
 
   r.stem = strings.ToUpper(prefix + r.stem + suffix)
 
@@ -327,12 +299,12 @@ func (r *Room) Leave(cookies []*http.Cookie) error {
     return fmt.Errorf("no credentials provided")
   }
 
-  r.logItemsPushed = len(r.log)
+  r.log.flush()
 
   if err := r.pm.removePlayer(username); err != nil {
     return err
   }
-  r.log = append(r.log, fmt.Sprintf("<i>%s</i> left the game.", username))
+  r.log.appendLeave(username)
   return nil
 }
 
@@ -360,11 +332,15 @@ func (r *Room) Concede(cookies []*http.Cookie) error {
         return fmt.Errorf("it is not your turn")
       }
   }
-  r.logItemsPushed = len(r.log)
+  r.log.flush()
 
-  r.pm.usernameToPlayer[username].incrementScore(0)
-  r.log = append(r.log, fmt.Sprintf(
-      "<i>%s</i> conceded the round. +1 <i>%s</i>", username, username))
+  isEliminated := r.pm.usernameToPlayer[username].incrementScore(
+      r.config.EliminationThreshold)
+
+  r.log.appendConcession(username)
+  if isEliminated {
+    r.log.appendElimination(username)
+  }
   r.newRound()
   return nil
 }
@@ -389,16 +365,14 @@ func (r *Room) Votekick(cookies []*http.Cookie,
     return err
   }
 
-  r.logItemsPushed = len(r.log)
-  r.log = append(r.log, fmt.Sprintf("<i>%s</i> voted to kick <i>%s</i>.",
-                                    voterUsername, kickRecipientUsername))
+  r.log.flush()
+  r.log.appendVoteToKick(voterUsername, kickRecipientUsername)
   // if a majority has voted to kick the player, remove them from the game
   if float64(kickRecipient.numVotesToKick) >= float64(len(r.pm.players)) / 1.9 {
     if err := r.pm.removePlayer(kickRecipientUsername); err != nil {
       return err
     }
-    r.log = append(r.log, fmt.Sprintf("<i>%s</i> was kicked from the game.",
-                                      kickRecipientUsername))
+    r.log.appendKick(kickRecipientUsername)
   }
   return nil
 }

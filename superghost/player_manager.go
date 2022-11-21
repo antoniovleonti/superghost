@@ -10,7 +10,6 @@ type playerManager struct {
   usernameToPlayer map[string]*Player
 
   currentPlayerIdx int
-  currentPlayerUsername string
 
   lastPlayerUsername string
   startingPlayerIdx int
@@ -21,6 +20,10 @@ func newPlayerManager() *playerManager {
   pm.players = make([]*Player, 0)
   pm.usernameToPlayer = make(map[string]*Player)
   return pm
+}
+
+func (pm *playerManager) currentPlayerUsername() string {
+  return pm.players[pm.currentPlayerIdx].username
 }
 
 func (pm *playerManager) addPlayer(username string, path string) (*http.Cookie, error) {
@@ -106,7 +109,7 @@ func (pm *playerManager) incrementCurrentPlayer() (ok bool) {
     pm.currentPlayerIdx = 0  // Seems extremely unlikely but I'd rather be safe
     return false
   }
-  for i := pm.currentPlayerIdx + 1;
+  for i := (pm.currentPlayerIdx + 1) % len(pm.players);
       i != pm.currentPlayerIdx;
       i = (i + 1) % len(pm.players) {
     if !pm.players[i].isEliminated {
@@ -134,4 +137,15 @@ func (pm *playerManager) incrementStartingPlayer() (ok bool) {
   }
   // Couldn't find a valid player (strange)
   return false
+}
+
+func (pm *playerManager) swapCurrentAndLastPlayers() bool {
+  for i, p := range pm.players {
+    if p.username == pm.lastPlayerUsername {
+      pm.lastPlayerUsername = pm.currentPlayerUsername()
+      pm.currentPlayerIdx = i
+      return true
+    }
+  }
+  return false // couldn't find last player
 }
