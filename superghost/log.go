@@ -91,3 +91,8 @@ func (bl *BufferedLog) appendKick(username string) {
   bl.history = append(bl.history, fmt.Sprintf(
       "<i>%s</i> was kicked from the game.", username))
 }
+
+func (bl *BufferedLog) appendGameOver(username string) {
+  bl.history = append(bl.history, fmt.Sprintf(
+      "<i>%s</i> won the game! Resetting scores.", username))
+}

@@ -149,3 +149,24 @@ func (pm *playerManager) swapCurrentAndLastPlayers() bool {
   }
   return false // couldn't find last player
 }
+
+func (pm *playerManager) resetScores() {
+  for _, p := range pm.players {
+    p.score = 0
+  }
+}
+
+func (pm *playerManager) onlyOnePlayerRemaining() (bool, string) {
+  nRemaining := 0
+  var winner string
+  for _, p := range pm.players {
+    if !p.isEliminated {
+      nRemaining++
+      winner = p.username
+      if nRemaining > 1 {
+        return false, ""
+      }
+    }
+  }
+  return true, winner
+}

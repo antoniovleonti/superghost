@@ -60,7 +60,7 @@ func (p *Player) votekick(voterUsername string) error {
 
 func (p *Player) incrementScore(eliminationThreshold int) (isEliminated bool) {
   p.score++
-  if eliminationThreshold > 0 && int(p.score) > eliminationThreshold {
+  if eliminationThreshold > 0 && int(p.score) >= eliminationThreshold {
     p.isEliminated = true
   }
   return p.isEliminated

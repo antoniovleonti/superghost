@@ -426,6 +426,7 @@ func main() {
         MaxPlayers: 5,
         MinStemLength: 5,
         IsPublic: true,
+        EliminationThreshold: 5,
       })
 
   http.ListenAndServe(":9090", server.Router)

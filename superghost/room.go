@@ -13,6 +13,7 @@ const (
   kEdit State = iota
   kRebut
   kInsufficientPlayers
+  kGameOver
 )
 func (p State) String() string {
   switch p {
@@ -22,6 +23,8 @@ func (p State) String() string {
       return "rebut"
     case kInsufficientPlayers:
       return "insufficient players"
+    case kGameOver:
+      return "game over"
     default:
       panic("invalid State value")
   }
@@ -93,6 +96,7 @@ func NewRoom(config Config) *Room {
   r.config.MaxPlayers = config.MaxPlayers
   r.config.MinStemLength = config.MinStemLength
   r.config.IsPublic = config.IsPublic
+  r.config.EliminationThreshold = config.EliminationThreshold
 
   r.pm = newPlayerManager()
   r.state = kInsufficientPlayers
@@ -276,10 +280,11 @@ func (r *Room) AffixWord(
 
 func (r *Room) newRound() {
   r.stem = ""
-  ok := r.pm.incrementStartingPlayer()
-  if !ok {
+  r.pm.incrementStartingPlayer()
+  if ok, winner := r.pm.onlyOnePlayerRemaining(); ok {
     // Game has ended
-    // Enter "game over" mode
+    r.log.appendGameOver(winner)
+    r.pm.resetScores()
     return
   }
   r.pm.currentPlayerIdx = r.pm.startingPlayerIdx
