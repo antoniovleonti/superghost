@@ -162,10 +162,10 @@ func (pm *playerManager) onlyOnePlayerRemaining() (bool, string) {
   for _, p := range pm.players {
     if !p.isEliminated {
       nRemaining++
-      winner = p.username
       if nRemaining > 1 {
         return false, ""
       }
+      winner = p.username
     }
   }
   return true, winner
