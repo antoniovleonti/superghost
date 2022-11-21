@@ -22,14 +22,22 @@ function getDefaultListener(method, path, form, onloadFn) {
   }
 }
 
-function getDefaultOnload(form) {
+function getDefaultOnload(form = null, errorFn = (err)=>console.error(err)) {
   return function(xhr) {
-    if (xhr.status != 200) {
-      console.log("Err: '" + xhr.responseText + "'.");
-      return;
-    }
-    if (form != null) {
-      form.reset();
+    switch (xhr.status) {
+      case 200:
+        if (form != null) form.reset();
+        break;
+
+      // Redirections
+      case 302:
+      case 303:
+        location.href = xhr.responseText;  // Redirect
+        break;
+
+      default:
+        errorFn(xhr.responseText);
+        break;
     }
   }
 }
