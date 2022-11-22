@@ -8,7 +8,7 @@ This repository contains server and client code for a Superghost web app. The se
 - Player identity & turn tracking via cookies
 - Concessions
 - Two distinct challenge types
-- Game log (dies with room)
+- Intra-room game log / history
 - Vote kicking
 
 ## Todo:
