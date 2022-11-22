@@ -52,6 +52,7 @@ func NewSuperghostServer() *SuperghostServer {
   server.Router.Post("/rooms/{roomID}/leave", server.leave)
   server.Router.Post("/rooms/{roomID}/players/{playerID}/votekick",
                      server.votekick)
+  server.Router.Get("/rooms/{roomID}/config", server.config)
 
   return server
 }
@@ -375,6 +376,27 @@ func (s *SuperghostServer) leave(w http.ResponseWriter, r *http.Request) {
       }
       redirectURIList(w, []string{"/"})
       roomWrapper.BroadcastGameState()
+
+    default:
+      http.Error(w, "", http.StatusMethodNotAllowed)
+  }
+}
+
+func (s *SuperghostServer) config(w http.ResponseWriter, r *http.Request) {
+  roomID := chi.URLParam(r, "roomID")
+  roomWrapper, ok := s.Rooms[roomID]
+  if !ok {
+    http.NotFound(w, r)
+    return
+  }
+  switch r.Method {
+
+    case http.MethodGet:
+      b, err := roomWrapper.Room.MarshalJSONConfig()
+      if err != nil {
+        panic ("couldn't marshal config")
+      }
+      fmt.Fprint(w, string(b))
 
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)

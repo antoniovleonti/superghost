@@ -31,10 +31,10 @@ func (p State) String() string {
 }
 
 type Config struct {
-  MaxPlayers int
-  MinStemLength int
-  IsPublic bool
-  EliminationThreshold int
+  MaxPlayers int `json:'maxPlayers'`
+  MinStemLength int `json:'minStemLength'`
+  IsPublic bool `json:'isPublic'`
+  EliminationThreshold int `json:'eliminationThreshold'`
 }
 
 type Room struct {
@@ -72,6 +72,10 @@ func (r *Room) MarshalJSON() ([]byte, error) {
     StartingPlayerIdx: r.pm.startingPlayerIdx,
     LogPush: r.log.history[r.log.itemsPushed:],
   })
+}
+
+func (r *Room) MarshalJSONConfig() ([]byte, error) {
+  return json.Marshal(r.config)
 }
 
 func (r *Room) MarshalJSONFullLog() ([]byte, error) {
