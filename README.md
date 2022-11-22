@@ -1,12 +1,15 @@
-# SUPERGHOST Web App
+# SUPERGHOST web app
 
-# Todo:
-- [ ] Elimination
-- [ ] Remove long idle games
-- [ ] Share room config with client
-- [ ] Chat
-- [ ] Keep game log at bottom
-- [ ] Join page
-- [ ] Index (landing) page
-- [ ] How to play
+This repository contains server and client code for a Superghost web app. The server is written in Go while the client is written in vanilla HTML, CSS, and Javascript.
 
+## Current features:
+- Create rooms
+- Game rule configuration (e.g. keep score, minimum word length, etc.)
+- Player identity & turn tracking via cookies
+- Concessions
+- Two distinct challenge types
+- Game log (dies with room)
+- Vote kicking
+
+## Todo:
+Check Issues page; PRs welcome (especially once this reaches more stable state).
