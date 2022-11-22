@@ -64,6 +64,15 @@ div { border: none; }
   width: 32px;
 }
 
+#config {
+  grid-column: -1 / -2;
+  grid-row: 2 / 4;
+  text-align: right;
+}
+#config dialog {
+  text-align: left;
+}
+
 #log {
   border-top: solid 1px;
   grid-column: 1 / 2;
@@ -169,6 +178,17 @@ input[name="prefix"] { text-align: right; }
       </div>
     </div>
 
+    <div id=config>
+      <button id=show-config-button>Show game rules</button>
+        <dialog id=config-dialog>
+          <h2>Game rules</h2>
+          <span id=config-span></span>
+          <form method=dialog>
+            <button id=hide-config-button>Hide</button>
+          </form>
+        </dialog>
+    </div>
+
     <div id=log>
       <h2>Game log</h2>
       <ol id=log-ol class="bottom-div scrollable-zebra">
@@ -209,6 +229,9 @@ const logOL = document.getElementById("log-ol");
 const chatOL = document.getElementById("chat-ol");
 const playersTable =
     document.getElementById("players-table").getElementsByTagName("tbody")[0];
+const configDialog = document.getElementById("config-dialog");
+const configSpan = document.getElementById("config-span");
+var config;
 
 // Static actions
 const affixForm = document.getElementById("affix-form");
@@ -216,6 +239,7 @@ const rebutForm = document.getElementById("rebut-form");
 const concedeButton = document.getElementById("concede");
 const challengeContButton = document.getElementById("ch-cont");
 const challengeIsWordButton = document.getElementById("ch-word");
+const showConfigButton = document.getElementById("show-config-button");
 
 // Dynamic buttons
 const leaveButton = document.createElement("button");
@@ -343,6 +367,20 @@ challengeIsWordButton.addEventListener(
 
 leaveButton.addEventListener(
     "click", getDefaultListener("POST", kRoomID + "/" + "leave"));
+
+showConfigButton.addEventListener("click", function (e) {
+      configDialog.showModal();
+      if (configSpan.innerHTML == "") {
+        sendRequest("GET", kRoomID + "/" + "config", null, function(xhr) {
+          let config = JSON.parse(xhr.responseText);
+          console.log(config);
+          for (const k in config) {
+            configSpan.innerHTML += k + ": " + config[k] + "<br>";
+          }
+          configSpan.innerHTML += "<br>";
+        });
+      }
+    });
 
 /***** STATE HANDLERS *****/
 function getCurrentGameState() {

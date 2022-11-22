@@ -31,10 +31,10 @@ func (p State) String() string {
 }
 
 type Config struct {
-  MaxPlayers int `json:'maxPlayers'`
-  MinStemLength int `json:'minStemLength'`
-  IsPublic bool `json:'isPublic'`
-  EliminationThreshold int `json:'eliminationThreshold'`
+  MaxPlayers int `json:"maxPlayers"`
+  MinStemLength int `json:"minStemLength"`
+  IsPublic bool `json:"isPublic"`
+  EliminationThreshold int `json:"eliminationThreshold"`
 }
 
 type Room struct {
