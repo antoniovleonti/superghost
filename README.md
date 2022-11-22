@@ -1,6 +1,8 @@
 # SUPERGHOST web app
 
-This repository contains server and client code for a Superghost web app. The server is written in Go while the client is written in vanilla HTML, CSS, and Javascript.
+This repository contains server and client code for a Superghost web app. The
+server is written in Go while the client is written in vanilla HTML, CSS, and
+Javascript.
 
 ## Current features:
 - Create rooms
