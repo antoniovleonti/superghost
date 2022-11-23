@@ -32,37 +32,27 @@
 
 <script>
 
+{{template "ClientUtils" .}}
+
 const createRoomForm = document.getElementById("create-room-form")
 const joinRoomForm = document.getElementById("join-room-form")
 
-createRoomForm.addEventListener("submit", function(e){
-  e.preventDefault() // do not write response to screen
-  var xhr = new XMLHttpRequest()
-	xhr.onload = function() {
-    if (xhr.status == 303) { // "see other"
-      location.href = xhr.responseText
-    }
-	}
-  xhr.open("POST", "rooms")
-  xhr.send(new URLSearchParams(new FormData(createRoomForm)))
-})
+createRoomForm.addEventListener(
+    "submit", getHTTPRequester(
+        "POST", "rooms", ()=>new URLSearchParams(new FormData(createRoomForm)),
+        getDefaultOnload(createRoomForm)));
 
-joinRoomForm.addEventListener("submit", function(e){
-  e.preventDefault()
-  roomURI = "rooms/" + joinRoomForm.elements["room-id"].value
+joinRoomForm.addEventListener(
+    "submit", getHTTPRequester(
+        "HEAD", ()=>"rooms/" + joinRoomForm.elements["room-id"].value, null,
+        function(xhr) {
+          if (xhr.status == 200) {
+            window.location.href =
+                "rooms/" + joinRoomForm.elements["room-id"].value;
+          } else {
+            document.getElementById("join-err").innerHTML = xhr.responseText;
+          }}));
 
-  var xhr = new XMLHttpRequest()
-	xhr.onload = function() {
-    if (xhr.status == 200) {
-      document.getElementById("join-err").innerHTML = ""
-      window.location.href = roomURI
-    } else {
-      document.getElementById("join-err").innerHTML = "<i>Not found.</i>"
-    }
-	}
-  xhr.open("HEAD", roomURI)
-  xhr.send()
-})
 </script>
 
 </html>
