@@ -207,8 +207,8 @@ func (r *Room) ChallengeContinuation(cookies []*http.Cookie) error {
     r.newRound()
     return nil
   }
-  r.log.appendChallengeContinuation(r.pm.currentPlayerUsername(),
-                                    r.pm.lastPlayerUsername)
+  r.log.appendChallengeContinuation(r.pm.lastPlayerUsername,
+                                    r.pm.currentPlayerUsername())
   r.state = kRebut
   return nil
 }

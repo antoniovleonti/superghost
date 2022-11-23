@@ -139,7 +139,7 @@ func (pm *playerManager) incrementStartingPlayer() (ok bool) {
   return false
 }
 
-func (pm *playerManager) swapCurrentAndLastPlayers() bool {
+func (pm *playerManager) swapCurrentAndLastPlayers() (ok bool) {
   for i, p := range pm.players {
     if p.username == pm.lastPlayerUsername {
       pm.lastPlayerUsername = pm.currentPlayerUsername()
