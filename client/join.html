@@ -28,11 +28,12 @@ const kRoomID = "{{.RoomID}}";
 const joinForm = document.getElementById("join-form");
 const status = document.getElementById("status");
 
-joinForm.addEventListener("submit", getDefaultListener(
-    "POST", "join", ()=>new URLSearchParams(new FormData(joinForm)),
-    getDefaultOnload(joinForm, function(err) {
-                       status.innerHTML = err;
-                     })));
+joinForm.addEventListener(
+    "submit", getHTTPRequester(
+        "POST", ()=>"join", ()=>new URLSearchParams(new FormData(joinForm)),
+        getDefaultOnload(joinForm, function(err) {
+                           status.innerHTML = err;
+                         })));
 
 </script>
 
