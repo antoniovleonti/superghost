@@ -93,15 +93,12 @@ func (s *SuperghostServer) rooms(w http.ResponseWriter, r *http.Request) {
 
       i := 0
       for k := range s.Rooms {
-        fmt.Println("room " + k)
         if !s.Rooms[k].Room.IsPublic() {
-          fmt.Println("skip")
           continue
         }
         arr[i] = s.Rooms[k].Room.Metadata(k)
         i++
       }
-      fmt.Printf("i = %d\n", i)
       b, err := json.Marshal(arr[:i])
       if err != nil {
         http.Error(w, "unexpected internal error",
@@ -149,7 +146,6 @@ func (s *SuperghostServer) room(w http.ResponseWriter, r *http.Request) {
   roomID := chi.URLParam(r, "roomID")
   roomWrapper, ok := s.Rooms[roomID]
   if !ok {
-    fmt.Println(roomID + " is not a valid room")
     http.NotFound(w, r)
     return
   }
@@ -461,7 +457,6 @@ func (rw *RoomWrapper) BroadcastGameState() {
     panic("couldn't get json room state") // something's gone terribly wrong
   }
   s := string(b)
-  fmt.Println(s) // print all updates to room state to the console!
   for _, c := range rw.Listeners {
     c <- s
   }
