@@ -286,10 +286,15 @@ function populatePlayers(players) {
 
 // 
 function appendToGameLog(logFlush) {
+  let isScrolledToBottom =
+      logOL.scrollHeight - logOL.clientHeight <= logOL.scrollTop + 1;
   for (const lf of logFlush) {
     newLI = document.createElement("li");
     newLI.innerHTML = lf;
     logOL.appendChild(newLI);
+  }
+  if (isScrolledToBottom) {
+    logOL.scrollTop = logOL.scrollHeight - logOL.clientHeight;
   }
 }
 
