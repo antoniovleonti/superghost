@@ -32,7 +32,7 @@ func (p State) String() string {
 
 type Config struct {
   MaxPlayers int `json:"maxPlayers"`
-  MinStemLength int `json:"minStemLength"`
+  MinWordLength int `json:"minStemLength"`
   IsPublic bool `json:"isPublic"`
   EliminationThreshold int `json:"eliminationThreshold"`
 }
@@ -49,7 +49,7 @@ type Room struct {
   log *BufferedLog
 }
 
-type jRoom struct { // publicly visible version of gamestate
+type JRoom struct { // publicly visible version of gamestate
   Players []*Player `json:"players"`
   Stem string       `json:"stem"`
   State string   `json:"state"`
@@ -63,7 +63,7 @@ func (r *Room) MarshalJSON() ([]byte, error) {
   r.mutex.RLock()
   defer r.mutex.RUnlock()
 
-  return json.Marshal(jRoom {
+  return json.Marshal(JRoom {
     Players: r.pm.players,
     Stem: strings.ToUpper(r.stem),
     State: r.state.String(),
@@ -82,7 +82,7 @@ func (r *Room) MarshalJSONFullLog() ([]byte, error) {
   r.mutex.RLock()
   defer r.mutex.RUnlock()
 
-  return json.Marshal(jRoom {
+  return json.Marshal(JRoom {
     Players: r.pm.players,
     Stem: strings.ToUpper(r.stem),
     State: r.state.String(),
@@ -93,12 +93,33 @@ func (r *Room) MarshalJSONFullLog() ([]byte, error) {
   })
 }
 
+type JRoomMetadata struct {
+  PlayerCount int
+  MaxPlayers int
+  EliminationThreshold int
+  MinWordLength int
+  ID string
+}
+
+func (r *Room) Metadata(ID string) JRoomMetadata {
+  r.mutex.RLock()
+  defer r.mutex.RUnlock()
+
+  return JRoomMetadata {
+    PlayerCount: len(r.pm.players),
+    MaxPlayers: r.config.MaxPlayers,
+    EliminationThreshold: r.config.EliminationThreshold,
+    MinWordLength: r.config.MinWordLength,
+    ID: ID,
+  }
+}
+
 func NewRoom(config Config) *Room {
   r := new(Room)
 
   r.config = new(Config)
   r.config.MaxPlayers = config.MaxPlayers
-  r.config.MinStemLength = config.MinStemLength
+  r.config.MinWordLength = config.MinWordLength
   r.config.IsPublic = config.IsPublic
   r.config.EliminationThreshold = config.EliminationThreshold
 
@@ -106,6 +127,10 @@ func NewRoom(config Config) *Room {
   r.state = kInsufficientPlayers
   r.log = newBufferedLog()
   return r
+}
+
+func (r *Room) IsPublic() bool {
+  return r.config.IsPublic;
 }
 
 // public, mutex-protected version
@@ -157,7 +182,7 @@ func (r *Room) ChallengeIsWord(cookies []*http.Cookie) error {
   if r.state != kEdit {
     return fmt.Errorf("cannot challenge right now")
   }
-  if len(r.stem) < r.config.MinStemLength {
+  if len(r.stem) < r.config.MinWordLength {
     return fmt.Errorf("minimum word length not met")
   }
 
@@ -227,7 +252,7 @@ func (r *Room) RebutChallenge(cookies []*http.Cookie,
   }
 
   continuation := strings.ToUpper(prefix + r.stem + suffix)
-  if len(continuation) < r.config.MinStemLength {
+  if len(continuation) < r.config.MinWordLength {
     return fmt.Errorf("minimum word length not met")
   }
 

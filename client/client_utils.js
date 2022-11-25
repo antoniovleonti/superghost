@@ -10,7 +10,6 @@ function sendHTTPRequest(method, pathFn, getDataFn=null, onloadFn=null) {
     }
   }
   let path = pathFn();
-  console.log(path);
   xhr.open(method, path);
   data = getDataFn == null ? null : getDataFn();
   console.log([method, path, data].join(" "));

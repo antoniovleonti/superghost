@@ -8,17 +8,16 @@
 
 <body>
 
-
 <h1>SUPERGHOST</h1>
 <form id=join-room-form>
-  <h2>Join a room:</h2>
-  <br><input type=text name=room-id>
+  <h2>Join a room</h2>
+  <input type=text name=room-id>
   <input type=submit value=Join>
   <span id=join-err></span>
 </form>
 
 <form id=create-room-form>
-  <h2>Create a room:</h2><br>
+  <h2>Create a room</h2>
   <label for=max-players>Max players:</label>
   <input type=number id=max-players name=maxPlayers min=2 max=8><br>
   <label for=min-length>Min word length:</label>
@@ -28,6 +27,21 @@
   <input type=submit value=Create>
 </form>
 
+<h2>Public rooms</h2>
+<table id=rooms-table class=scrollable-zebra>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Players</th>
+      <th>Min word length</th>
+      <th>Elimination threshold</th>
+      <th>Join</th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+
 </body>
 
 <script>
@@ -36,10 +50,13 @@
 
 const createRoomForm = document.getElementById("create-room-form")
 const joinRoomForm = document.getElementById("join-room-form")
+const roomsTable =
+    document.getElementById("rooms-table").getElementsByTagName("tbody")[0];
 
 createRoomForm.addEventListener(
     "submit", getHTTPRequester(
-        "POST", "rooms", ()=>new URLSearchParams(new FormData(createRoomForm)),
+        "POST", ()=>"rooms",
+        ()=>new URLSearchParams(new FormData(createRoomForm)),
         getDefaultOnload(createRoomForm)));
 
 joinRoomForm.addEventListener(
@@ -52,6 +69,39 @@ joinRoomForm.addEventListener(
           } else {
             document.getElementById("join-err").innerHTML = xhr.responseText;
           }}));
+
+function populateRoomsTable() {
+  sendHTTPRequest("GET", ()=>"rooms", ()=>null, function (xhr) {
+    if (xhr.status == 200) {
+      let rooms = JSON.parse(xhr.responseText);
+      console.log(rooms);
+      roomsTable.innerHTML = "";
+      for (const room of rooms) {
+        roomsTable.appendChild(createTableRowFromRoom(room));
+      }
+    } else {
+      console.error(xhr.responseText);
+    }
+  });
+}
+
+function createTableRowFromRoom(room) {
+  let row = document.createElement("tr");
+  row.insertCell().appendChild(document.createTextNode(room.ID));
+  row.insertCell().appendChild(document.createTextNode(
+      room.PlayerCount + " / " + room.MaxPlayers));
+  row.insertCell().appendChild(document.createTextNode(room.MinWordLength));
+  row.insertCell().appendChild(document.createTextNode(
+      room.EliminationThreshold));
+  joinButton = document.createElement("button");
+  joinButton.innerHTML = "Join";
+  joinButton.addEventListener(
+      "click", ()=>window.location.href = "rooms/" + room.ID);
+  row.insertCell().appendChild(joinButton);
+  return row
+}
+
+populateRoomsTable();
 
 </script>
 

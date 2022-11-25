@@ -2,6 +2,7 @@ package main
 
 import (
   "fmt"
+  "encoding/json"
   "github.com/go-chi/chi/v5"
   "net/http"
   "strconv"
@@ -35,6 +36,7 @@ func NewSuperghostServer() *SuperghostServer {
 
   server.Router = chi.NewRouter()
   server.Router.Get("/", server.home)
+  server.Router.Get("/rooms", server.rooms)
   server.Router.Post("/rooms", server.rooms)
   server.Router.Get("/rooms/{roomID}", server.room)
   server.Router.Head("/rooms/{roomID}", server.room)
@@ -85,6 +87,30 @@ func (s *SuperghostServer) home(w http.ResponseWriter, r *http.Request) {
 func (s *SuperghostServer) rooms(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
 
+    // Send a list of the public games in play
+    case http.MethodGet:
+      arr := make([]superghost.JRoomMetadata, len(s.Rooms))
+
+      i := 0
+      for k := range s.Rooms {
+        fmt.Println("room " + k)
+        if !s.Rooms[k].Room.IsPublic() {
+          fmt.Println("skip")
+          continue
+        }
+        arr[i] = s.Rooms[k].Room.Metadata(k)
+        i++
+      }
+      fmt.Printf("i = %d\n", i)
+      b, err := json.Marshal(arr[:i])
+      if err != nil {
+        http.Error(w, "unexpected internal error",
+                   http.StatusInternalServerError)
+        panic(err.Error())
+      }
+      fmt.Fprintln(w, string(b))
+      return
+
     case http.MethodPost:
       // validate params
       parseFormErr := r.ParseForm()
@@ -108,7 +134,7 @@ func (s *SuperghostServer) rooms(w http.ResponseWriter, r *http.Request) {
       roomID := superghost.GetRandBase32String(6)
       s.Rooms[roomID] = NewRoomWrapper(superghost.Config{
             MaxPlayers: maxPlayers,
-            MinStemLength: minWordLength,
+            MinWordLength: minWordLength,
             IsPublic: isPublic,
           })
       redirectURIList(w, []string{"/rooms/" + roomID + "/join"})
@@ -446,7 +472,7 @@ func main() {
   server := NewSuperghostServer()
   server.Rooms["test-room"] = NewRoomWrapper(superghost.Config{
         MaxPlayers: 5,
-        MinStemLength: 5,
+        MinWordLength: 5,
         IsPublic: true,
         EliminationThreshold: 5,
       })
