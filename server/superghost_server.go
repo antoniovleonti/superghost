@@ -1,4 +1,4 @@
-package main
+package sgserver
 
 import (
   "fmt"
@@ -8,53 +8,8 @@ import (
   "strconv"
   "strings"
   "superghost"
-  "sync"
   "text/template"
 )
-
-type ListenerGroup struct {
-  Listeners []chan string
-  ListenersMutex sync.RWMutex
-}
-
-func newListenerGroup() *ListenerGroup {
-  lg := new(ListenerGroup)
-  lg.Listeners = make([]chan string, 0)
-  return lg
-}
-
-func (lg *ListenerGroup) AddListener() chan string {
-  lg.ListenersMutex.Lock()
-  defer lg.ListenersMutex.Unlock()
-
-  newChan := make(chan string)
-  lg.Listeners = append(lg.Listeners, newChan)
-  return newChan
-}
-
-func (lg *ListenerGroup) Broadcast(s string) {
-  lg.ListenersMutex.Lock()
-  defer lg.ListenersMutex.Unlock()
-
-  for _, c := range lg.Listeners {
-    c <- s
-  }
-  lg.Listeners = make([]chan string, 0) // clear
-}
-
-type RoomWrapper struct {
-  UpdateListeners *ListenerGroup
-  ChatListeners *ListenerGroup
-  Room *superghost.Room
-}
-
-func NewRoomWrapper(config superghost.Config) *RoomWrapper {
-  rw := new(RoomWrapper)
-  rw.Room = superghost.NewRoom(config)
-  rw.UpdateListeners = newListenerGroup()
-  rw.ChatListeners = newListenerGroup()
-  return rw
-}
 
 type SuperghostServer struct {
   Rooms map[string]*RoomWrapper
@@ -509,25 +464,3 @@ func (s *SuperghostServer) votekick(w http.ResponseWriter, r *http.Request) {
       http.Error(w, "", http.StatusMethodNotAllowed)
   }
 }
-
-func (rw *RoomWrapper) BroadcastGameState() {
-  b, err := rw.Room.MarshalJSON()
-  if err != nil {
-    panic("couldn't get json room state") // something's gone terribly wrong
-  }
-  s := string(b)
-  rw.UpdateListeners.Broadcast(s)
-}
-
-func main() {
-  server := NewSuperghostServer()
-  server.Rooms["test-room"] = NewRoomWrapper(superghost.Config{
-        MaxPlayers: 5,
-        MinWordLength: 5,
-        IsPublic: true,
-        EliminationThreshold: 5,
-      })
-
-  http.ListenAndServe(":9090", server.Router)
-}
-
