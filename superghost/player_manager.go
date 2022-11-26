@@ -26,7 +26,8 @@ func (pm *playerManager) currentPlayerUsername() string {
   return pm.players[pm.currentPlayerIdx].username
 }
 
-func (pm *playerManager) addPlayer(username string, path string) (*http.Cookie, error) {
+func (pm *playerManager) addPlayer(username string, path string) (
+    *http.Cookie, error) {
   if !_usernamePattern.MatchString(username) {
     return nil, fmt.Errorf("username must be alphanumeric")
   }
@@ -35,6 +36,7 @@ func (pm *playerManager) addPlayer(username string, path string) (*http.Cookie, 
   }
 
   p := NewPlayer(username, path)
+  pm.players = append(pm.players, p)
   pm.usernameToPlayer[username] = p
 
   return p.cookie, nil

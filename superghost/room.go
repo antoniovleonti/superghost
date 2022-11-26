@@ -153,19 +153,13 @@ func (r *Room) AddPlayer(username string, path string) (*http.Cookie, error) {
   if len(r.pm.players) >= r.config.MaxPlayers {
     return nil, fmt.Errorf("player limit reached")
   }
-  if !_usernamePattern.MatchString(username) {
-    return nil, fmt.Errorf("username must be alphanumeric")
-  }
-  if _, ok := r.pm.usernameToPlayer[username]; ok {
-    return nil, fmt.Errorf("username '%s' already in use", username)
+
+  cookie, err := r.pm.addPlayer(username, path)
+  if err != nil {
+    return nil, err
   }
 
   r.log.flush()
-
-  p := NewPlayer(username, path)
-  r.pm.usernameToPlayer[username] = p
-  r.pm.players = append(r.pm.players, p)
-
   r.log.appendJoin(username)
 
   if len(r.pm.players) >= 2 && r.state == kInsufficientPlayers {
@@ -174,7 +168,7 @@ func (r *Room) AddPlayer(username string, path string) (*http.Cookie, error) {
   if len(r.pm.players) < 2 {
     r.state = kInsufficientPlayers
   }
-  return p.cookie, nil
+  return cookie, nil
 }
 
 func (r *Room) ChallengeIsWord(cookies []*http.Cookie) error {
