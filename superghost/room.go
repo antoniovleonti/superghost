@@ -359,6 +359,9 @@ func (r *Room) Concede(cookies []*http.Cookie) error {
       if len(r.stem) == 0 {
         return fmt.Errorf("cannot concede when word is empty")
       }
+      if r.pm.usernameToPlayer[username].isEliminated {
+        return fmt.Errorf("cannot concede when eliminated")
+      }
 
     case kRebut:
       if (username != r.pm.lastPlayerUsername &&
