@@ -37,6 +37,11 @@ type Config struct {
   EliminationThreshold int `json:"eliminationThreshold"`
 }
 
+type Message struct {
+  Sender string
+  Content string
+}
+
 type Room struct {
   config *Config
   mutex sync.RWMutex
@@ -412,4 +417,21 @@ func (r *Room) Votekick(cookies []*http.Cookie,
     r.log.appendKick(kickRecipientUsername)
   }
   return nil
+}
+
+// Just validate request & return a message object so that the server can
+// broadcast it.
+func (r *Room) Chat(cookies []*http.Cookie, content string) (*Message, error) {
+  username, ok := r.GetValidCookie(cookies)
+  if !ok {
+    return nil, fmt.Errorf("no credentials provided")
+  }
+  if len(content) == 0 {
+    return nil, fmt.Errorf("empty message")
+  }
+
+  msg := new(Message)
+  msg.Sender = username
+  msg.Content = content
+  return msg, nil
 }

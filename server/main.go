@@ -12,16 +12,47 @@ import (
   "text/template"
 )
 
-type RoomWrapper struct {
+type ListenerGroup struct {
   Listeners []chan string
   ListenersMutex sync.RWMutex
+}
+
+func newListenerGroup() *ListenerGroup {
+  lg := new(ListenerGroup)
+  lg.Listeners = make([]chan string, 0)
+  return lg
+}
+
+func (lg *ListenerGroup) AddListener() chan string {
+  lg.ListenersMutex.Lock()
+  defer lg.ListenersMutex.Unlock()
+
+  newChan := make(chan string)
+  lg.Listeners = append(lg.Listeners, newChan)
+  return newChan
+}
+
+func (lg *ListenerGroup) Broadcast(s string) {
+  lg.ListenersMutex.Lock()
+  defer lg.ListenersMutex.Unlock()
+
+  for _, c := range lg.Listeners {
+    c <- s
+  }
+  lg.Listeners = make([]chan string, 0) // clear
+}
+
+type RoomWrapper struct {
+  UpdateListeners *ListenerGroup
+  ChatListeners *ListenerGroup
   Room *superghost.Room
 }
 
 func NewRoomWrapper(config superghost.Config) *RoomWrapper {
   rw := new(RoomWrapper)
   rw.Room = superghost.NewRoom(config)
-  rw.Listeners = make([]chan string, 0)
+  rw.UpdateListeners = newListenerGroup()
+  rw.ChatListeners = newListenerGroup()
   return rw
 }
 
@@ -55,6 +86,8 @@ func NewSuperghostServer() *SuperghostServer {
   server.Router.Post("/rooms/{roomID}/players/{playerID}/votekick",
                      server.votekick)
   server.Router.Get("/rooms/{roomID}/config", server.config)
+  server.Router.Post("/rooms/{roomID}/chat", server.chat)
+  server.Router.Get("/rooms/{roomID}/next-chat", server.chat)
 
   return server
 }
@@ -346,11 +379,7 @@ func (s *SuperghostServer) nextState(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
 
     case http.MethodGet:
-      roomWrapper.ListenersMutex.Lock()
-      myChan := make(chan string)
-      roomWrapper.Listeners = append(roomWrapper.Listeners, myChan)
-      roomWrapper.ListenersMutex.Unlock()
-
+      myChan := roomWrapper.UpdateListeners.AddListener()
       fmt.Fprint(w, <-myChan)
 
     default:
@@ -425,6 +454,39 @@ func (s *SuperghostServer) config(w http.ResponseWriter, r *http.Request) {
   }
 }
 
+func (s *SuperghostServer) chat(w http.ResponseWriter, r *http.Request) {
+  roomID := chi.URLParam(r, "roomID")
+  roomWrapper, ok := s.Rooms[roomID]
+  if !ok {
+    http.NotFound(w, r)
+    return
+  }
+  switch r.Method {
+
+    case http.MethodGet:
+      myChan := roomWrapper.ChatListeners.AddListener()
+      fmt.Fprint(w, <-myChan)
+
+
+    case http.MethodPost:
+      msg, err := roomWrapper.Room.Chat(r.Cookies(), r.FormValue("content"))
+      if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+      }
+      fmt.Fprint(w, "success")
+      // Broadcast chat message to everyone
+      b, err := json.Marshal(msg)
+      if err != nil {
+        panic(err)
+      }
+      roomWrapper.ChatListeners.Broadcast(string(b))
+
+    default:
+      http.Error(w, "", http.StatusMethodNotAllowed)
+  }
+}
+
 func (s *SuperghostServer) votekick(w http.ResponseWriter, r *http.Request) {
   roomID := chi.URLParam(r, "roomID")
   roomWrapper, ok := s.Rooms[roomID]
@@ -449,18 +511,12 @@ func (s *SuperghostServer) votekick(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rw *RoomWrapper) BroadcastGameState() {
-  rw.ListenersMutex.Lock()
-  defer rw.ListenersMutex.Unlock()
-
   b, err := rw.Room.MarshalJSON()
   if err != nil {
     panic("couldn't get json room state") // something's gone terribly wrong
   }
   s := string(b)
-  for _, c := range rw.Listeners {
-    c <- s
-  }
-  rw.Listeners = make([]chan string, 0) // clear
+  rw.UpdateListeners.Broadcast(s)
 }
 
 func main() {
