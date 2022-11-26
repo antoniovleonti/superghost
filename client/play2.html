@@ -342,13 +342,13 @@ function writeStem(stem) {
   }
 }
 
-function renderGameState(state) {
-  let nextPlayer = state.players[state.currentPlayerIdx].username;
-  populatePlayers(state.players);
-  updateButtons(nextPlayer == kMyUsername, state.state);
-  writeShortStatus(nextPlayer, state.lastPlayerUsername, state.state);
-  writeStem(state.stem);
-  appendToGameLog(state.logPush);
+function renderGameState(room) {
+  let nextPlayer = room.players[room.currentPlayerIdx].username;
+  populatePlayers(room.players);
+  updateButtons(nextPlayer == kMyUsername, room.state);
+  writeShortStatus(nextPlayer, room.lastPlayerUsername, room.state);
+  writeStem(room.stem);
+  appendToGameLog(room.logPush);
 }
 
 /***** BUTTON HANDLERS *****/
@@ -398,18 +398,18 @@ function getConfig() {
 
 function getCurrentGameState() {
   let onload = function(xhr) {
-    let state = JSON.parse(xhr.responseText);
-    console.log(state);
-    renderGameState(state);
+    let room = JSON.parse(xhr.responseText);
+    console.log(room);
+    renderGameState(room);
   }
   sendHTTPRequest("GET", ()=>kRoomID + "/current-state", null, onload);
 }
 
 function getNextGameState() {
   let onload = function(xhr) {
-    let state = JSON.parse(xhr.responseText);
-    console.log(state);
-    renderGameState(state);
+    let room = JSON.parse(xhr.responseText);
+    console.log(room);
+    renderGameState(room);
     getNextGameState();
   }
   sendHTTPRequest("GET", ()=>kRoomID + "/next-state", null, onload);
