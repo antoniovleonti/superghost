@@ -200,7 +200,8 @@ input[name="prefix"] { text-align: right; }
       <ol id=chat-ol class="bottom-div scrollable-zebra">
       </ol>
       <form id=chat-form>
-        <input type=text><button type=submit>Send</button>
+        <input type=text name=content>
+        <button type=submit>Send</button>
       </form>
     </div>
 
@@ -236,6 +237,7 @@ var config;
 // Static actions
 const affixForm = document.getElementById("affix-form");
 const rebutForm = document.getElementById("rebut-form");
+const chatForm = document.getElementById("chat-form");
 const concedeButton = document.getElementById("concede");
 const challengeContButton = document.getElementById("ch-cont");
 const challengeIsWordButton = document.getElementById("ch-word");
@@ -295,6 +297,19 @@ function appendToGameLog(logFlush) {
   }
   if (isScrolledToBottom) {
     logOL.scrollTop = logOL.scrollHeight - logOL.clientHeight;
+  }
+}
+
+function appendToChat(msg) {
+  let isScrolledToBottom =
+      chatOL.scrollHeight - chatOL.clientHeight <= chatOL.scrollTop + 1;
+
+  let newLI = document.createElement("li");
+  newLI.innerHTML = msg.Sender + ": " + msg.Content;
+  chatOL.appendChild(newLI);
+
+  if (isScrolledToBottom) {
+    chatOL.scrollTop = chatOL.scrollHeight - chatOL.clientHeight;
   }
 }
 
@@ -364,6 +379,12 @@ rebutForm.addEventListener(
         ()=>new URLSearchParams(new FormData(rebutForm)),
         getDefaultOnload(rebutForm)));
 
+chatForm.addEventListener(
+    "submit", getHTTPRequester(
+        "POST", ()=>kRoomID + "/chat",
+        ()=>new URLSearchParams(new FormData(chatForm)),
+        getDefaultOnload(chatForm)));
+
 concedeButton.addEventListener(
     "click", getHTTPRequester("POST", ()=>kRoomID + "/concession"));
 
@@ -415,10 +436,21 @@ function getNextGameState() {
   sendHTTPRequest("GET", ()=>kRoomID + "/next-state", null, onload);
 }
 
+function getNextChat() {
+  let onload = function(xhr) {
+    let msg = JSON.parse(xhr.responseText);
+    console.log(msg);
+    appendToChat(msg);
+    getNextChat();
+  }
+  sendHTTPRequest("GET", ()=>kRoomID + "/next-chat", null, onload);
+}
+
 // Enter game loop
 getCurrentGameState();
 getConfig();
 getNextGameState();
+getNextChat();
 
 </script>
 
