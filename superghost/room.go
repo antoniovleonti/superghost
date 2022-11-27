@@ -35,6 +35,7 @@ type Config struct {
   MinWordLength int
   IsPublic bool
   EliminationThreshold int
+  AllowRepeatWords bool
 }
 
 type Message struct {
@@ -50,6 +51,7 @@ type Room struct {
 
   stem string
   state State
+  usedWords map[string]bool
 
   log *BufferedLog
 }
@@ -130,6 +132,7 @@ func NewRoom(config Config) *Room {
 
   r.pm = newPlayerManager()
   r.state = kInsufficientPlayers
+  r.usedWords = make(map[string]bool)
   r.log = newBufferedLog()
   return r
 }
@@ -189,12 +192,13 @@ func (r *Room) ChallengeIsWord(cookies []*http.Cookie) error {
   r.log.appendChallengeIsWord(r.pm.currentPlayerUsername(),
                               r.pm.lastPlayerUsername)
 
-  isWord, err := validateWord(r.stem)
+  isWord, err := validateWord(r.stem, r.usedWords, r.config.AllowRepeatWords)
   if err != nil {
     return err
   }
   var loser string
   if isWord {
+    r.usedWords[r.stem] = true
     loser = r.pm.lastPlayerUsername
     if p, ok := r.pm.usernameToPlayer[r.pm.lastPlayerUsername]; ok {
       p.incrementScore(r.config.EliminationThreshold)
@@ -258,7 +262,8 @@ func (r *Room) RebutChallenge(cookies []*http.Cookie,
   r.log.flush()
   r.log.appendRebuttal(r.pm.currentPlayerUsername(), continuation)
   // check if it is a word
-  isWord, err := validateWord(continuation)
+  isWord, err := validateWord(continuation, r.usedWords,
+                              r.config.AllowRepeatWords)
   if err != nil {
     return err
   }
@@ -266,6 +271,7 @@ func (r *Room) RebutChallenge(cookies []*http.Cookie,
   var loser string
   if isWord {
     // challenger gets a letter
+    r.usedWords[continuation] = true
     loser = r.pm.lastPlayerUsername
     if p, ok := r.pm.usernameToPlayer[r.pm.lastPlayerUsername]; ok {
       p.incrementScore(r.config.EliminationThreshold)

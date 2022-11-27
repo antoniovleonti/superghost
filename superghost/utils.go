@@ -13,9 +13,13 @@ import(
 var _usernamePattern *regexp.Regexp
 var _alphaPattern *regexp.Regexp
 
-func validateWord(word string) (isWord bool, err error) {
+func validateWord(word string, usedWords map[string]bool, allowRepeats bool) (
+    isWord bool, err error) {
   if !_alphaPattern.MatchString(word) {
     return false, fmt.Errorf("word is invalid format")
+  }
+  if _, ok := usedWords[word]; !allowRepeats && ok {
+    return false, fmt.Errorf("word has already been used")
   }
   reqUri := "https://api.dictionaryapi.dev/api/v2/entries/en/" + word
   resp, err := http.Get(reqUri)
