@@ -31,10 +31,10 @@ func (p State) String() string {
 }
 
 type Config struct {
-  MaxPlayers int `json:"maxPlayers"`
-  MinWordLength int `json:"minStemLength"`
-  IsPublic bool `json:"isPublic"`
-  EliminationThreshold int `json:"eliminationThreshold"`
+  MaxPlayers int
+  MinWordLength int
+  IsPublic bool
+  EliminationThreshold int
 }
 
 type Message struct {
@@ -55,13 +55,13 @@ type Room struct {
 }
 
 type JRoom struct { // publicly visible version of gamestate
-  Players []*Player `json:"players"`
-  Stem string       `json:"stem"`
-  State string   `json:"state"`
-  CurrentPlayerIdx int    `json:"currentPlayerIdx"`
-  LastPlayerUsername string `json:"lastPlayerUsername"`
-  StartingPlayerIdx int   `json:"startingPlayerIdx"`
-  LogPush []string `json:"logPush"`
+  Players []*Player
+  Stem string
+  State string
+  CurrentPlayerIdx int
+  LastPlayerUsername string
+  StartingPlayerIdx int
+  LogPush []string
 }
 
 func (r *Room) MarshalJSON() ([]byte, error) {

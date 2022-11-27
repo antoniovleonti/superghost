@@ -18,10 +18,10 @@ type Player struct {
 }
 
 type JPlayer struct {
-  Username string `json:"username"`
-  Score uint        `json:"score"`
-  NumVotesToKick uint `json:"numVotesToKick"`
-  IsEliminated bool `json:"isEliminated"`
+  Username string
+  Score uint
+  NumVotesToKick uint
+  IsEliminated bool
 }
 
 func (p *Player) MarshalJSON() ([]byte, error) {

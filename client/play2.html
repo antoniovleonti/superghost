@@ -267,21 +267,21 @@ const kRoomID = "{{.RoomID}}";
 function populatePlayers(players) {
   playersTable.innerHTML = "";
   for (const p of players) {
-    isMe = p.username == kMyUsername;
+    isMe = p.Username == kMyUsername;
     let row = playersTable.insertRow();
 
     let usernameCell = row.insertCell();
-    usernameCell.innerHTML = p.username + (isMe ? " <i>(you)</i>" : "");
+    usernameCell.innerHTML = p.Username + (isMe ? " <i>(you)</i>" : "");
 
     let scoreCell = row.insertCell();
-    scoreCell.innerHTML = "GHOST".slice(0, Math.min(p.score, 5))
-                              + (p.score > 5 ? " +" + (p.score - 5) : "");
+    scoreCell.innerHTML = "GHOST".slice(0, Math.min(p.Score, 5))
+                              + (p.Score > 5 ? " +" + (p.Score - 5) : "");
 
     let actionsCell = row.insertCell();
     if (isMe) {
       actionsCell.appendChild(leaveButton);
     } else {
-      actionsCell.appendChild(getVotekickButton(p.username));
+      actionsCell.appendChild(getVotekickButton(p.Username));
     }
   }
 }
@@ -357,12 +357,12 @@ function writeStem(stem) {
 }
 
 function renderGameState(room) {
-  let nextPlayer = room.players[room.currentPlayerIdx].username;
-  populatePlayers(room.players);
-  updateButtons(nextPlayer == kMyUsername, room.state);
-  writeShortStatus(nextPlayer, room.lastPlayerUsername, room.state);
-  writeStem(room.stem);
-  appendToGameLog(room.logPush);
+  let nextPlayer = room.Players[room.CurrentPlayerIdx].Username;
+  populatePlayers(room.Players);
+  updateButtons(nextPlayer == kMyUsername, room.State);
+  writeShortStatus(nextPlayer, room.LastPlayerUsername, room.State);
+  writeStem(room.Stem);
+  appendToGameLog(room.LogPush);
 }
 
 /***** BUTTON HANDLERS *****/
