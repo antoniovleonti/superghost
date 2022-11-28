@@ -9,12 +9,13 @@ import(
 
 type Player struct {
   username string
-  score uint
   cookie *http.Cookie
+
+  score uint
+  isEliminated bool
+
   numVotesToKick uint
   whoVotedToKick map[string]bool
-  lastHeartbeat time.Time
-  isEliminated bool
 }
 
 type JPlayer struct {
