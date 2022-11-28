@@ -98,29 +98,37 @@ func (s *SuperghostServer) rooms(w http.ResponseWriter, r *http.Request) {
 
     case http.MethodPost:
       // validate params
-      parseFormErr := r.ParseForm()
-      if parseFormErr != nil {
-        http.Error(w, parseFormErr.Error(), http.StatusBadRequest)
+      err := r.ParseForm()
+      if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
         return
       }
-      maxPlayers, maxPlayersErr := strconv.Atoi(r.FormValue("maxPlayers"))
-      if maxPlayersErr != nil {
-        http.Error(w, maxPlayersErr.Error(), http.StatusBadRequest)
+      maxPlayers, err := strconv.Atoi(r.FormValue("MaxPlayers"))
+      if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
         return
       }
-      minWordLength, minWordLengthErr :=
-          strconv.Atoi(r.FormValue("minWordLength"))
-      if minWordLengthErr != nil {
-        http.Error(w, minWordLengthErr.Error(), http.StatusBadRequest)
+      minWordLength, err := strconv.Atoi(r.FormValue("MinWordLength"))
+      if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
         return
       }
-      isPublic := r.FormValue("isPublic") == "on"
+      eliminationThreshold, err :=
+          strconv.Atoi(r.FormValue("EliminationThreshold"))
+      if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+      }
+      isPublic := r.FormValue("IsPublic") == "on"
+      allowRepeatWords := r.FormValue("AllowRepeatWords") == "on"
 
       roomID := superghost.GetRandBase32String(6)
       s.Rooms[roomID] = NewRoomWrapper(superghost.Config{
             MaxPlayers: maxPlayers,
             MinWordLength: minWordLength,
             IsPublic: isPublic,
+            EliminationThreshold: eliminationThreshold,
+            AllowRepeatWords: allowRepeatWords,
           })
       redirectURIList(w, []string{"/rooms/" + roomID + "/join"})
       return
