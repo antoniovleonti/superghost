@@ -315,13 +315,12 @@ func (r *Room) AffixWord(
 func (r *Room) newRound() {
   r.stem = ""
   r.pm.incrementStartingPlayer()
+  r.pm.currentPlayerIdx = r.pm.startingPlayerIdx
   if ok, winner := r.pm.onlyOnePlayerRemaining(); ok {
     // Game has ended
     r.log.appendGameOver(winner)
     r.pm.resetScores()
-    return
   }
-  r.pm.currentPlayerIdx = r.pm.startingPlayerIdx
   if len(r.pm.players) >= 2 {
     r.state = kEdit
   } else {
