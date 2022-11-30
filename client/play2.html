@@ -210,7 +210,7 @@ input[name="prefix"] { text-align: right; }
       <div id=players-table-wrapper class="bottom-div scrollable-zebra">
       <table id=players-table>
         <thead>
-          <tr><th>Name</th><th>Score</th><th>Actions</th></tr>
+          <tr><th>Name</th><th>Time</th><th>Score</th><th>Actions</th></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -264,14 +264,27 @@ const kRoomID = "{{.RoomID}}";
 /***** RENDERING / POPULATING ELEMENTS *****/
 
 // Populate player list.
-function populatePlayers(players) {
+function populatePlayers(players, currentPlayerUsername,
+                         currentPlayerDeadline) {
   playersTable.innerHTML = "";
   for (const p of players) {
     isMe = p.Username == kMyUsername;
     let row = playersTable.insertRow();
 
     let usernameCell = row.insertCell();
-    usernameCell.innerHTML = p.Username + (isMe ? " <i>(you)</i>" : "");
+    usernameCell.innerHTML = p.Username
+    if (isMe) usernameCell.innerHTML += " <i>(you)</i>"
+
+    let timeCell = row.insertCell();
+    if (p.Username == currentPlayerUsername) {
+      setInterval(
+          function () {
+            let seconds = (currentPlayerDeadline - new Date()) / 1000
+            timeCell.innerHTML = Math.max(seconds, 0).toFixed(2)
+          }, 10);
+    } else if (p.TimeRemaining > 0) {
+      timeCell.innerHTML = (p.TimeRemaining / 1000000000).toFixed(2)
+    }
 
     let scoreCell = row.insertCell();
     scoreCell.innerHTML = "GHOST".slice(0, Math.min(p.Score, 5))
@@ -357,10 +370,11 @@ function writeStem(stem) {
 }
 
 function renderGameState(room) {
-  let nextPlayer = room.Players[room.CurrentPlayerIdx].Username;
-  populatePlayers(room.Players);
-  updateButtons(nextPlayer == kMyUsername, room.State);
-  writeShortStatus(nextPlayer, room.LastPlayerUsername, room.State);
+  let deadline = Date.parse(room.CurrentPlayerDeadline)
+  populatePlayers(room.Players, room.CurrentPlayerUsername, deadline);
+  updateButtons(room.CurrentPlayerUsername == kMyUsername, room.State);
+  writeShortStatus(room.CurrentPlayerUsername, room.LastPlayerUsername,
+                   room.State);
   writeStem(room.Stem);
   appendToGameLog(room.LogPush);
 }

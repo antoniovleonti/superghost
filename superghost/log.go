@@ -96,3 +96,8 @@ func (bl *BufferedLog) appendGameOver(username string) {
   bl.history = append(bl.history, fmt.Sprintf(
       "<i>%s</i> won the game! Resetting scores.", username))
 }
+
+func (bl *BufferedLog) appendTimeout(username string) {
+  bl.history = append(bl.history, fmt.Sprintf(
+      "<i>%s</i> ran out of time. +1 <i>%s</i>.", username, username))
+}

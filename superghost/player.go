@@ -16,6 +16,9 @@ type Player struct {
 
   numVotesToKick uint
   whoVotedToKick map[string]bool
+
+  // Not a countdown timer-- only accurate when it is not this player's turn
+  timeRemaining time.Duration
 }
 
 type JPlayer struct {
@@ -23,6 +26,7 @@ type JPlayer struct {
   Score uint
   NumVotesToKick uint
   IsEliminated bool
+  TimeRemaining time.Duration
 }
 
 func (p *Player) MarshalJSON() ([]byte, error) {
@@ -31,19 +35,17 @@ func (p *Player) MarshalJSON() ([]byte, error) {
     Score: p.score,
     NumVotesToKick: p.numVotesToKick,
     IsEliminated: p.isEliminated,
+    TimeRemaining: p.timeRemaining,
   })
 }
 
-func (p *Player) heartbeat() {
-  p.lastHeartbeat = time.Now()
-}
-
-func NewPlayer(username string, path string) *Player {
+func NewPlayer(username string, path string,
+               startingTime time.Duration) *Player {
   p := new(Player)
   p.username = username
   p.cookie = newCookie(path, username)
-  p.lastHeartbeat = time.Now()
   p.whoVotedToKick = make(map[string]bool, 0)
+  p.timeRemaining = startingTime
   return p
 }
 

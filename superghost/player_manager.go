@@ -3,6 +3,7 @@ package superghost
 import (
   "fmt"
   "net/http"
+  "time"
 )
 
 type playerManager struct {
@@ -10,6 +11,7 @@ type playerManager struct {
   usernameToPlayer map[string]*Player
 
   currentPlayerIdx int
+  currentPlayerDeadline time.Time
 
   lastPlayerUsername string
   startingPlayerIdx int
@@ -26,7 +28,12 @@ func (pm *playerManager) currentPlayerUsername() string {
   return pm.players[pm.currentPlayerIdx].username
 }
 
-func (pm *playerManager) addPlayer(username string, path string) (
+func (pm *playerManager) currentPlayer() *Player {
+  return pm.players[pm.currentPlayerIdx]
+}
+
+func (pm *playerManager) addPlayer(username string, path string,
+                                   startingTime time.Duration) (
     *http.Cookie, error) {
   if !_usernamePattern.MatchString(username) {
     return nil, fmt.Errorf("username must be alphanumeric")
@@ -35,7 +42,7 @@ func (pm *playerManager) addPlayer(username string, path string) (
     return nil, fmt.Errorf("username '%s' already in use", username)
   }
 
-  p := NewPlayer(username, path)
+  p := NewPlayer(username, path, startingTime)
   pm.players = append(pm.players, p)
   pm.usernameToPlayer[username] = p
 
@@ -155,6 +162,7 @@ func (pm *playerManager) swapCurrentAndLastPlayers() (ok bool) {
 func (pm *playerManager) resetScores() {
   for _, p := range pm.players {
     p.score = 0
+    p.isEliminated = false
   }
 }
 
@@ -171,4 +179,15 @@ func (pm *playerManager) onlyOnePlayerRemaining() (bool, string) {
     }
   }
   return true, winner
+}
+
+func (pm *playerManager) setCurrentPlayerDeadline() (time.Time) {
+  pm.currentPlayerDeadline = time.Now().Add(pm.currentPlayer().timeRemaining)
+  return pm.currentPlayerDeadline
+}
+
+func (pm *playerManager) resetPlayerTimes(startingTime time.Duration) {
+  for _, p :=  range pm.players {
+    p.timeRemaining = startingTime
+  }
 }

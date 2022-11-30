@@ -5,16 +5,25 @@ import (
 )
 
 type RoomWrapper struct {
+  Room *superghost.Room
+
   UpdateListeners *ListenerGroup
   ChatListeners *ListenerGroup
-  Room *superghost.Room
+
+  asyncUpdateCh chan bool
 }
 
 func NewRoomWrapper(config superghost.Config) *RoomWrapper {
   rw := new(RoomWrapper)
-  rw.Room = superghost.NewRoom(config)
+
+  rw.asyncUpdateCh = make(chan bool)
+  rw.Room = superghost.NewRoom(config, rw.asyncUpdateCh)
+
   rw.UpdateListeners = newListenerGroup()
   rw.ChatListeners = newListenerGroup()
+
+  go rw.ListenForAsyncUpdateSignals()
+
   return rw
 }
 
@@ -27,3 +36,9 @@ func (rw *RoomWrapper) BroadcastGameState() {
   rw.UpdateListeners.Broadcast(s)
 }
 
+func (rw *RoomWrapper) ListenForAsyncUpdateSignals() {
+  for {
+    <-rw.asyncUpdateCh
+    rw.BroadcastGameState()
+  }
+}

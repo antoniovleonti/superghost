@@ -1,14 +1,15 @@
 package sgserver
 
 import (
-  "fmt"
   "encoding/json"
+  "fmt"
   "github.com/go-chi/chi/v5"
   "net/http"
   "strconv"
   "strings"
   "superghost"
   "text/template"
+  "time"
 )
 
 type SuperghostServer struct {
@@ -122,6 +123,11 @@ func (s *SuperghostServer) rooms(w http.ResponseWriter, r *http.Request) {
       isPublic := r.FormValue("IsPublic") == "on"
       allowRepeatWords := r.FormValue("AllowRepeatWords") == "on"
 
+      playerTimePerWord, err := strconv.Atoi(r.FormValue("PlayerTimePerWord"))
+      if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+      }
+
       roomID := superghost.GetRandBase32String(6)
       s.Rooms[roomID] = NewRoomWrapper(superghost.Config{
             MaxPlayers: maxPlayers,
@@ -129,6 +135,7 @@ func (s *SuperghostServer) rooms(w http.ResponseWriter, r *http.Request) {
             IsPublic: isPublic,
             EliminationThreshold: eliminationThreshold,
             AllowRepeatWords: allowRepeatWords,
+            PlayerTimePerWord: time.Duration(playerTimePerWord) * time.Second,
           })
       redirectURIList(w, []string{"/rooms/" + roomID + "/join"})
       return

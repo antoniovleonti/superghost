@@ -6,6 +6,7 @@ import (
   "net/http"
   "strings"
   "sync"
+  "time"
 )
 
 type State int
@@ -36,6 +37,7 @@ type Config struct {
   IsPublic bool
   EliminationThreshold int
   AllowRepeatWords bool
+  PlayerTimePerWord time.Duration
 }
 
 type Message struct {
@@ -45,7 +47,6 @@ type Message struct {
 
 type Room struct {
   config *Config
-  mutex sync.RWMutex
 
   pm *playerManager
 
@@ -54,13 +55,19 @@ type Room struct {
   usedWords map[string]bool
 
   log *BufferedLog
+
+  mutex sync.RWMutex
+
+  endTurnCh chan bool
+  asyncUpdateCh chan<- bool
 }
 
 type JRoom struct { // publicly visible version of gamestate
   Players []*Player
   Stem string
   State string
-  CurrentPlayerIdx int
+  CurrentPlayerUsername string
+  CurrentPlayerDeadline time.Time
   LastPlayerUsername string
   StartingPlayerIdx int
   LogPush []string
@@ -74,7 +81,8 @@ func (r *Room) MarshalJSON() ([]byte, error) {
     Players: r.pm.players,
     Stem: strings.ToUpper(r.stem),
     State: r.state.String(),
-    CurrentPlayerIdx: r.pm.currentPlayerIdx,
+    CurrentPlayerUsername: r.pm.currentPlayerUsername(),
+    CurrentPlayerDeadline: r.pm.currentPlayerDeadline,
     LastPlayerUsername: r.pm.lastPlayerUsername,
     StartingPlayerIdx: r.pm.startingPlayerIdx,
     LogPush: r.log.history[r.log.itemsPushed:],
@@ -93,7 +101,8 @@ func (r *Room) MarshalJSONFullLog() ([]byte, error) {
     Players: r.pm.players,
     Stem: strings.ToUpper(r.stem),
     State: r.state.String(),
-    CurrentPlayerIdx: r.pm.currentPlayerIdx,
+    CurrentPlayerUsername: r.pm.currentPlayerUsername(),
+    CurrentPlayerDeadline: r.pm.currentPlayerDeadline,
     LastPlayerUsername: r.pm.lastPlayerUsername,
     StartingPlayerIdx: r.pm.startingPlayerIdx,
     LogPush: r.log.history,
@@ -108,6 +117,26 @@ type JRoomMetadata struct {
   ID string
 }
 
+func NewRoom(config Config, asyncUpdateCh chan<- bool) *Room {
+  r := new(Room)
+
+  r.config = new(Config)
+  r.config.MaxPlayers = config.MaxPlayers
+  r.config.MinWordLength = config.MinWordLength
+  r.config.IsPublic = config.IsPublic
+  r.config.EliminationThreshold = config.EliminationThreshold
+  r.config.PlayerTimePerWord = config.PlayerTimePerWord
+
+  r.asyncUpdateCh = asyncUpdateCh
+  r.endTurnCh = make(chan bool)
+
+  r.pm = newPlayerManager()
+  r.state = kInsufficientPlayers
+  r.usedWords = make(map[string]bool)
+  r.log = newBufferedLog()
+  return r
+}
+
 func (r *Room) Metadata(ID string) JRoomMetadata {
   r.mutex.RLock()
   defer r.mutex.RUnlock()
@@ -119,22 +148,6 @@ func (r *Room) Metadata(ID string) JRoomMetadata {
     MinWordLength: r.config.MinWordLength,
     ID: ID,
   }
-}
-
-func NewRoom(config Config) *Room {
-  r := new(Room)
-
-  r.config = new(Config)
-  r.config.MaxPlayers = config.MaxPlayers
-  r.config.MinWordLength = config.MinWordLength
-  r.config.IsPublic = config.IsPublic
-  r.config.EliminationThreshold = config.EliminationThreshold
-
-  r.pm = newPlayerManager()
-  r.state = kInsufficientPlayers
-  r.usedWords = make(map[string]bool)
-  r.log = newBufferedLog()
-  return r
 }
 
 func (r *Room) IsPublic() bool {
@@ -157,7 +170,7 @@ func (r *Room) AddPlayer(username string, path string) (*http.Cookie, error) {
     return nil, fmt.Errorf("player limit reached")
   }
 
-  cookie, err := r.pm.addPlayer(username, path)
+  cookie, err := r.pm.addPlayer(username, path, r.config.PlayerTimePerWord)
   if err != nil {
     return nil, err
   }
@@ -167,6 +180,7 @@ func (r *Room) AddPlayer(username string, path string) (*http.Cookie, error) {
 
   if len(r.pm.players) >= 2 && r.state == kInsufficientPlayers {
     r.state = kEdit
+    r.startTurnAndCountdown(r.pm.currentPlayerUsername())
   }
   if len(r.pm.players) < 2 {
     r.state = kInsufficientPlayers
@@ -192,10 +206,16 @@ func (r *Room) ChallengeIsWord(cookies []*http.Cookie) error {
   r.log.appendChallengeIsWord(r.pm.currentPlayerUsername(),
                               r.pm.lastPlayerUsername)
 
+  // Even if the player's time expires here, we have the mutex, so it won't be
+  // acted on until after we validate the word. If the validation errors,
+  // however, the player is SOL
   isWord, err := validateWord(r.stem, r.usedWords, r.config.AllowRepeatWords)
   if err != nil {
     return err
   }
+
+  r.endTurn()
+
   var loser string
   if isWord {
     r.usedWords[r.stem] = true
@@ -235,6 +255,7 @@ func (r *Room) ChallengeContinuation(cookies []*http.Cookie) error {
     r.newRound()
     return nil
   }
+  r.startTurnAndCountdown(r.pm.currentPlayerUsername())
   r.log.appendChallengeContinuation(r.pm.lastPlayerUsername,
                                     r.pm.currentPlayerUsername())
   r.state = kRebut
@@ -267,6 +288,9 @@ func (r *Room) RebutChallenge(cookies []*http.Cookie,
   if err != nil {
     return err
   }
+
+  r.endTurn()
+
   // update game Room accordingly
   var loser string
   if isWord {
@@ -290,6 +314,7 @@ func (r *Room) AffixWord(
     cookies []*http.Cookie, prefix string, suffix string) error {
   r.mutex.Lock()
   defer r.mutex.Unlock()
+
   if r.state != kEdit {
     return fmt.Errorf("cannot affix right now")
   }
@@ -302,6 +327,8 @@ func (r *Room) AffixWord(
         "(received: {prefix: '%s', suffix: '%s'})", prefix, suffix)
   }
 
+  r.endTurn()
+
   // update log
   r.log.flush()
   r.log.appendAffixation(r.pm.currentPlayerUsername(), prefix, r.stem, suffix)
@@ -309,20 +336,25 @@ func (r *Room) AffixWord(
   r.stem = strings.ToUpper(prefix + r.stem + suffix)
 
   r.pm.incrementCurrentPlayer()
+  r.startTurnAndCountdown(r.pm.currentPlayerUsername())
+
   return nil
 }
 
 func (r *Room) newRound() {
   r.stem = ""
-  r.pm.incrementStartingPlayer()
-  r.pm.currentPlayerIdx = r.pm.startingPlayerIdx
   if ok, winner := r.pm.onlyOnePlayerRemaining(); ok {
     // Game has ended
     r.log.appendGameOver(winner)
     r.pm.resetScores()
   }
+  r.pm.incrementStartingPlayer()
+  r.pm.currentPlayerIdx = r.pm.startingPlayerIdx
+  r.pm.resetPlayerTimes(r.config.PlayerTimePerWord)
+
   if len(r.pm.players) >= 2 {
     r.state = kEdit
+    r.startTurnAndCountdown(r.pm.currentPlayerUsername())
   } else {
     r.state = kInsufficientPlayers
   }
@@ -337,11 +369,13 @@ func (r *Room) Leave(cookies []*http.Cookie) error {
     return fmt.Errorf("no credentials provided")
   }
 
-  r.log.flush()
-
   if err := r.pm.removePlayer(username); err != nil {
     return err
   }
+  if username == r.pm.currentPlayerUsername() {
+    r.endTurn()
+  }
+  r.log.flush()
   r.log.appendLeave(username)
   return nil
 }
@@ -373,15 +407,18 @@ func (r *Room) Concede(cookies []*http.Cookie) error {
         return fmt.Errorf("it is not your turn")
       }
   }
-  r.log.flush()
+
+  r.endTurn()
 
   isEliminated := r.pm.usernameToPlayer[username].incrementScore(
       r.config.EliminationThreshold)
 
+  r.log.flush()
   r.log.appendConcession(username)
   if isEliminated {
     r.log.appendElimination(username)
   }
+
   r.newRound()
   return nil
 }
@@ -433,4 +470,58 @@ func (r *Room) Chat(cookies []*http.Cookie, content string) (*Message, error) {
   msg.Sender = username
   msg.Content = content
   return msg, nil
+}
+
+func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
+  // Outside the go func() {} section, this is a synchronous function that runs
+  // only when called by another mutex-protected function (therefor DO NOT grab
+  // the mutex outside the go func() part!)
+  if r.config.PlayerTimePerWord == 0 * time.Second {
+    return
+  }
+  timesUp := time.NewTimer(time.Until(r.pm.setCurrentPlayerDeadline()))
+
+  go func() {
+
+    select {
+      case <-timesUp.C:
+        // The player has run out of time
+        r.mutex.Lock()
+        defer r.mutex.Unlock()
+
+        if expectedPlayerUsername != r.pm.currentPlayerUsername() {
+          // The player sent their response at the moment they ran out of time
+          // but before we got the mutex lock. For now I'll just give it to
+          // them but I can see this being very unintuitive if the time is
+          // exactly 00:00:00s or something. This can be fixed by making sure
+          // the time remaining is non-zero before accepting their input.
+
+          // Nothing to clean up since the timer fired, just exit the function
+          return
+        }
+
+        isEliminated := r.pm.currentPlayer().incrementScore(
+            r.config.EliminationThreshold)
+
+        r.log.flush()
+        r.log.appendTimeout(r.pm.currentPlayerUsername())
+        if isEliminated {
+          r.log.appendElimination(r.pm.currentPlayerUsername())
+        }
+
+        r.newRound()
+        r.asyncUpdateCh<-true // notify the frontend of the update to game state
+
+      case <-r.endTurnCh:
+        // The player beat the clock (and currently has control over the mutex).
+        // Just stop the timer and let the synchronous code take care of the
+        // rest.
+        timesUp.Stop()
+    }
+  }()
+}
+
+func (r *Room) endTurn() {
+  r.endTurnCh<-true // This will stop the countdown thread
+  r.pm.currentPlayer().timeRemaining = time.Until(r.pm.currentPlayerDeadline)
 }
