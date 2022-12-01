@@ -13,6 +13,7 @@ type Player struct {
 
   score uint
   isEliminated bool
+  isReady bool
 
   numVotesToKick uint
   whoVotedToKick map[string]bool
@@ -26,6 +27,7 @@ type JPlayer struct {
   Score uint
   NumVotesToKick uint
   IsEliminated bool
+  IsReady bool
   TimeRemaining time.Duration
 }
 
@@ -35,6 +37,7 @@ func (p *Player) MarshalJSON() ([]byte, error) {
     Score: p.score,
     NumVotesToKick: p.numVotesToKick,
     IsEliminated: p.isEliminated,
+    IsReady: p.isReady,
     TimeRemaining: p.timeRemaining,
   })
 }
@@ -46,6 +49,8 @@ func NewPlayer(username string, path string,
   p.cookie = newCookie(path, username)
   p.whoVotedToKick = make(map[string]bool, 0)
   p.timeRemaining = startingTime
+  p.isReady = false
+
   return p
 }
 

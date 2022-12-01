@@ -13,8 +13,7 @@ type State int
 const (
   kEdit State = iota
   kRebut
-  kInsufficientPlayers
-  kGameOver
+  kWaitingToStart
 )
 func (p State) String() string {
   switch p {
@@ -22,10 +21,8 @@ func (p State) String() string {
       return "edit"
     case kRebut:
       return "rebut"
-    case kInsufficientPlayers:
-      return "insufficient players"
-    case kGameOver:
-      return "game over"
+    case kWaitingToStart:
+      return "waiting to start"
     default:
       panic("invalid State value")
   }
@@ -133,7 +130,7 @@ func NewRoom(config Config, asyncUpdateCh chan<- bool) *Room {
   r.endTurnCh = make(chan bool)
 
   r.pm = newPlayerManager()
-  r.state = kInsufficientPlayers
+  r.waitToStart()
   r.usedWords = make(map[string]bool)
   r.log = newBufferedLog()
   return r
@@ -190,13 +187,6 @@ func (r *Room) AddPlayer(username string, path string) (*http.Cookie, error) {
   r.log.flush()
   r.log.appendJoin(username)
 
-  if len(r.pm.players) >= 2 && r.state == kInsufficientPlayers {
-    r.state = kEdit
-    r.startTurnAndCountdown(r.pm.currentPlayerUsername())
-  }
-  if len(r.pm.players) < 2 {
-    r.state = kInsufficientPlayers
-  }
   return cookie, nil
 }
 
@@ -243,7 +233,7 @@ func (r *Room) ChallengeIsWord(cookies []*http.Cookie) error {
     loser = p.username
   }
   r.log.appendChallengeResult(strings.ToUpper(r.stem), isWord, loser)
-  r.newRound()
+  r.newRoundOrGame()
   return nil
 }
 
@@ -263,12 +253,14 @@ func (r *Room) ChallengeContinuation(cookies []*http.Cookie) error {
     return fmt.Errorf("cannot challenge empty stem")
   }
 
+  r.endTurn()
+
   r.log.flush()
 
   if !r.pm.swapCurrentAndLastPlayers() {
     r.log.appendChallengedPlayerLeft(r.pm.currentPlayerUsername(),
                                      r.pm.lastPlayerUsername)
-    r.newRound()
+    r.newRoundOrGame()
     return nil
   }
   r.startTurnAndCountdown(r.pm.currentPlayerUsername())
@@ -324,7 +316,7 @@ func (r *Room) RebutChallenge(cookies []*http.Cookie,
     loser = p.username
   }
   r.log.appendChallengeResult(continuation, isWord, loser)
-  r.newRound()
+  r.newRoundOrGame()
   return nil
 }
 
@@ -361,22 +353,25 @@ func (r *Room) AffixWord(
   return nil
 }
 
-func (r *Room) newRound() {
+func (r *Room) newRoundOrGame() {
   r.stem = ""
-  if ok, winner := r.pm.onlyOnePlayerRemaining(); ok {
-    // Game has ended
-    r.log.appendGameOver(winner)
+  if weHaveAWinner, winner := r.pm.onlyOnePlayerNotEliminated();
+      r.pm.numReadyPlayers() < 2 || weHaveAWinner {
+    if weHaveAWinner {
+      r.log.appendGameOver(winner)
+    } else {
+      r.log.appendInsufficientPlayers()
+    }
     r.pm.resetScores()
+    r.pm.resetReadiness()
+    r.waitToStart()
   }
   r.pm.incrementStartingPlayer()
   r.pm.currentPlayerIdx = r.pm.startingPlayerIdx
   r.pm.resetPlayerTimes(r.config.PlayerTimePerWord)
 
-  if len(r.pm.players) >= 2 {
-    r.state = kEdit
+  if r.state == kEdit {
     r.startTurnAndCountdown(r.pm.currentPlayerUsername())
-  } else {
-    r.state = kInsufficientPlayers
   }
 }
 
@@ -391,7 +386,7 @@ func (r *Room) Leave(cookies []*http.Cookie) error {
     return fmt.Errorf("no credentials provided")
   }
 
-  if err := r.pm.removePlayer(username); err != nil {
+  if err := r.removePlayer(username); err != nil {
     return err
   }
   if username == r.pm.currentPlayerUsername() {
@@ -414,7 +409,7 @@ func (r *Room) Concede(cookies []*http.Cookie) error {
   }
   switch r.state {
 
-    case kInsufficientPlayers:
+    case kWaitingToStart:
       return fmt.Errorf("cannot concede right now")
 
     case kEdit:
@@ -427,7 +422,7 @@ func (r *Room) Concede(cookies []*http.Cookie) error {
 
     case kRebut:
       if (username != r.pm.lastPlayerUsername &&
-          username != r.pm.players[r.pm.currentPlayerIdx].username) {
+          username != r.pm.currentPlayerUsername()) {
         return fmt.Errorf("it is not your turn")
       }
   }
@@ -443,7 +438,7 @@ func (r *Room) Concede(cookies []*http.Cookie) error {
     r.log.appendElimination(username)
   }
 
-  r.newRound()
+  r.newRoundOrGame()
   return nil
 }
 
@@ -473,7 +468,7 @@ func (r *Room) Votekick(cookies []*http.Cookie,
   r.log.appendVoteToKick(voterUsername, kickRecipientUsername)
   // if a majority has voted to kick the player, remove them from the game
   if float64(kickRecipient.numVotesToKick) >= float64(len(r.pm.players)) / 1.9 {
-    if err := r.pm.removePlayer(kickRecipientUsername); err != nil {
+    if err := r.removePlayer(kickRecipientUsername); err != nil {
       return err
     }
     r.log.appendKick(kickRecipientUsername)
@@ -541,10 +536,11 @@ func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
           r.log.appendElimination(r.pm.currentPlayerUsername())
         }
 
-        r.newRound()
+        r.newRoundOrGame()
         r.asyncUpdateCh<-true // notify the frontend of the update to game state
 
       case <-r.endTurnCh:
+        fmt.Println("Stopping timer")
         // The player beat the clock (and currently has control over the mutex).
         // Just stop the timer and let the synchronous code take care of the
         // rest.
@@ -556,4 +552,48 @@ func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
 func (r *Room) endTurn() {
   r.endTurnCh<-true // This will stop the countdown thread
   r.pm.currentPlayer().timeRemaining = time.Until(r.pm.currentPlayerDeadline)
+}
+
+func (r *Room) removePlayer(username string) error {
+  err := r.pm.removePlayer(username)
+  if err != nil {
+    return err
+  }
+  if r.pm.numReadyPlayers() < 2 {
+    r.newRoundOrGame()
+  }
+  return nil
+}
+
+func (r *Room) ReadyUp(cookies []*http.Cookie) error {
+  r.mutex.Lock()
+  defer r.mutex.Unlock()
+
+  // check cookies
+  username, ok := r.pm.getValidCookie(cookies)
+  if !ok {
+    return fmt.Errorf("no credentials provided")
+  }
+  if r.pm.usernameToPlayer[username].isReady == true {
+    return fmt.Errorf("you're already ready")
+  }
+  // ready up
+  r.pm.usernameToPlayer[username].isReady = true
+
+  r.log.flush()
+  r.log.appendReadyUp(username)
+  // if all players are ready, start game (if not started already)
+  if r.state == kWaitingToStart &&
+      len(r.pm.players) >= 2 &&
+      r.pm.allPlayersReady() {
+    r.state = kEdit
+    r.log.appendGameStart()
+    r.startTurnAndCountdown(r.pm.currentPlayerUsername())
+  }
+  return nil
+}
+
+func (r *Room) waitToStart() {
+  r.state = kWaitingToStart
+  r.pm.currentPlayerDeadline = time.Unix(0, 0) // zero time
 }

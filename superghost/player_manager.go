@@ -138,7 +138,7 @@ func (pm *playerManager) incrementStartingPlayer() (ok bool) {
   for i := (pm.startingPlayerIdx + 1) % len(pm.players);
       i != pm.startingPlayerIdx;
       i = (i + 1) % len(pm.players) {
-    if !pm.players[i].isEliminated {
+    if !pm.players[i].isEliminated && pm.players[i].isReady {
       pm.lastPlayerUsername = ""
       pm.startingPlayerIdx = i
       return true
@@ -166,7 +166,32 @@ func (pm *playerManager) resetScores() {
   }
 }
 
-func (pm *playerManager) onlyOnePlayerRemaining() (bool, string) {
+func (pm *playerManager) resetReadiness() {
+  for _, p := range pm.players {
+    p.isReady = false
+  }
+}
+
+func (pm *playerManager) allPlayersReady() bool {
+  for _, p := range pm.players {
+    if !p.isReady {
+      return false
+    }
+  }
+  return true
+}
+
+func (pm *playerManager) numReadyPlayers() int {
+  nReady := 0
+  for _, p := range pm.players {
+    if p.isReady {
+      nReady++
+    }
+  }
+  return nReady
+}
+
+func (pm *playerManager) onlyOnePlayerNotEliminated() (bool, string) {
   nRemaining := 0
   var winner string
   for _, p := range pm.players {

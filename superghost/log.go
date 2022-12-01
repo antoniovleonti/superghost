@@ -94,10 +94,25 @@ func (bl *BufferedLog) appendKick(username string) {
 
 func (bl *BufferedLog) appendGameOver(username string) {
   bl.history = append(bl.history, fmt.Sprintf(
-      "<i>%s</i> won the game! Resetting scores.", username))
+      "<i>%s</i> won the game! Ready up to play another.", username))
 }
 
 func (bl *BufferedLog) appendTimeout(username string) {
   bl.history = append(bl.history, fmt.Sprintf(
       "<i>%s</i> ran out of time. +1 <i>%s</i>.", username, username))
+}
+
+func (bl *BufferedLog) appendInsufficientPlayers() {
+  bl.history = append(bl.history, fmt.Sprintf(
+      "There aren't enough players to continue play."))
+}
+
+func (bl *BufferedLog) appendGameStart() {
+  bl.history = append(bl.history, fmt.Sprintf(
+      "All players ready! Starting game!"))
+}
+
+func (bl *BufferedLog) appendReadyUp(username string) {
+  bl.history = append(bl.history, fmt.Sprintf(
+      "<i>%s</i> is ready.", username))
 }

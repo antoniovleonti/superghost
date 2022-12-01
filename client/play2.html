@@ -257,6 +257,11 @@ function getVotekickButton(playerToKick) {
   return votekickButton;
 }
 
+const readyUpButton = document.createElement("button");
+readyUpButton.innerHTML = "Ready up";
+readyUpButton.addEventListener(
+    "click", getHTTPRequester("POST", ()=>kRoomID + "/ready-up"));
+
 // Server-side rendered constants
 const kMyUsername = "{{.Username}}";
 const kRoomID = "{{.RoomID}}";
@@ -276,13 +281,13 @@ function populatePlayers(players, currentPlayerUsername,
     if (isMe) usernameCell.innerHTML += " <i>(you)</i>"
 
     let timeCell = row.insertCell();
-    if (p.Username == currentPlayerUsername) {
+    if (p.Username == currentPlayerUsername && currentPlayerDeadline != 0) {
       setInterval(
           function () {
             let seconds = (currentPlayerDeadline - new Date()) / 1000
             timeCell.innerHTML = Math.max(seconds, 0).toFixed(2)
           }, 10);
-    } else if (p.TimeRemaining > 0) {
+    } else {
       timeCell.innerHTML = (p.TimeRemaining / 1000000000).toFixed(2)
     }
 
@@ -293,6 +298,7 @@ function populatePlayers(players, currentPlayerUsername,
     let actionsCell = row.insertCell();
     if (isMe) {
       actionsCell.appendChild(leaveButton);
+      if (!p.IsReady) actionsCell.appendChild(readyUpButton);
     } else {
       actionsCell.appendChild(getVotekickButton(p.Username));
     }
@@ -353,9 +359,8 @@ function writeShortStatus(nextPlayer, lastPlayer, state) {
       shortStatus.innerHTML = "It is " + nextOrYour + " turn to rebut "
                                   + lastOrYour + " challenge.";
       break;
-    case "insufficient players":
-      shortStatus.innerHTML =
-          "Waiting for players (share the URL to invite someone!).";
+    case "waiting to start":
+      shortStatus.innerHTML = "Waiting for all (2+) players to ready up.";
       break;
     default:  // (Indicative of a bug)
       shortStatus.innerHTML = "? (Not implemented)";
