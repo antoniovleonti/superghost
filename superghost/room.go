@@ -540,7 +540,6 @@ func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
         r.asyncUpdateCh<-true // notify the frontend of the update to game state
 
       case <-r.endTurnCh:
-        fmt.Println("Stopping timer")
         // The player beat the clock (and currently has control over the mutex).
         // Just stop the timer and let the synchronous code take care of the
         // rest.
