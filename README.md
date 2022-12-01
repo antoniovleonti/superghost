@@ -12,6 +12,7 @@ Javascript.
 - Two distinct challenge types
 - Intra-room game log / history
 - Vote kicking
+- Game clocks (like chess or go)
 
 ## Todo:
 Check Issues page; PRs welcome (especially once this reaches more stable state).
