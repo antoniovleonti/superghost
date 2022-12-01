@@ -60,6 +60,8 @@ type Room struct {
 
   endTurnCh chan bool
   asyncUpdateCh chan<- bool
+
+  lastTouch time.Time
 }
 
 type JRoom struct { // publicly visible version of gamestate
@@ -151,7 +153,15 @@ func (r *Room) Metadata(ID string) JRoomMetadata {
 }
 
 func (r *Room) IsPublic() bool {
-  return r.config.IsPublic;
+  return r.config.IsPublic
+}
+
+func (r *Room) LastTouch() time.Time {
+  return r.lastTouch
+}
+
+func (r *Room) updateLastTouch() {
+  r.lastTouch = time.Now()
 }
 
 // public, mutex-protected version
@@ -165,6 +175,8 @@ func (r *Room) GetValidCookie(cookies []*http.Cookie) (string, bool) {
 func (r *Room) AddPlayer(username string, path string) (*http.Cookie, error) {
   r.mutex.Lock()
   defer r.mutex.Unlock()
+
+  r.updateLastTouch()
 
   if len(r.pm.players) >= r.config.MaxPlayers {
     return nil, fmt.Errorf("player limit reached")
@@ -191,6 +203,8 @@ func (r *Room) AddPlayer(username string, path string) (*http.Cookie, error) {
 func (r *Room) ChallengeIsWord(cookies []*http.Cookie) error {
   r.mutex.Lock()
   defer r.mutex.Unlock()
+
+  r.updateLastTouch()
 
   if _, ok := r.pm.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
@@ -237,6 +251,8 @@ func (r *Room) ChallengeContinuation(cookies []*http.Cookie) error {
   r.mutex.Lock()
   defer r.mutex.Unlock()
 
+  r.updateLastTouch()
+
   if _, ok := r.pm.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
   }
@@ -267,6 +283,8 @@ func (r *Room) RebutChallenge(cookies []*http.Cookie,
                               suffix string) error {
   r.mutex.Lock()
   defer r.mutex.Unlock()
+
+  r.updateLastTouch()
 
   if r.state != kRebut {
     return fmt.Errorf("cannot rebut right now")
@@ -314,6 +332,8 @@ func (r *Room) AffixWord(
     cookies []*http.Cookie, prefix string, suffix string) error {
   r.mutex.Lock()
   defer r.mutex.Unlock()
+
+  r.updateLastTouch()
 
   if r.state != kEdit {
     return fmt.Errorf("cannot affix right now")
@@ -364,6 +384,8 @@ func (r *Room) Leave(cookies []*http.Cookie) error {
   r.mutex.Lock()
   defer r.mutex.Unlock()
 
+  r.updateLastTouch()
+
   username, ok := r.pm.getValidCookie(cookies)
   if !ok {
     return fmt.Errorf("no credentials provided")
@@ -383,6 +405,8 @@ func (r *Room) Leave(cookies []*http.Cookie) error {
 func (r *Room) Concede(cookies []*http.Cookie) error {
   r.mutex.Lock()
   defer r.mutex.Unlock()
+
+  r.updateLastTouch()
 
   username, ok := r.pm.getValidCookie(cookies)
   if !ok {
@@ -428,6 +452,8 @@ func (r *Room) Votekick(cookies []*http.Cookie,
   r.mutex.Lock()
   defer r.mutex.Unlock()
 
+  r.updateLastTouch()
+
   voterUsername, ok := r.pm.getValidCookie(cookies)
   if !ok {
     return fmt.Errorf("no credentials provided")
@@ -458,6 +484,10 @@ func (r *Room) Votekick(cookies []*http.Cookie,
 // Just validate request & return a message object so that the server can
 // broadcast it.
 func (r *Room) Chat(cookies []*http.Cookie, content string) (*Message, error) {
+  r.mutex.Lock()
+  r.updateLastTouch()
+  r.mutex.Unlock()
+
   username, ok := r.GetValidCookie(cookies)
   if !ok {
     return nil, fmt.Errorf("no credentials provided")
@@ -488,6 +518,8 @@ func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
         // The player has run out of time
         r.mutex.Lock()
         defer r.mutex.Unlock()
+
+        r.updateLastTouch()
 
         if expectedPlayerUsername != r.pm.currentPlayerUsername() {
           // The player sent their response at the moment they ran out of time

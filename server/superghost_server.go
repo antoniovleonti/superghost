@@ -45,6 +45,8 @@ func NewSuperghostServer() *SuperghostServer {
   server.Router.Post("/rooms/{roomID}/chat", server.chat)
   server.Router.Get("/rooms/{roomID}/next-chat", server.chat)
 
+  go server.periodicallyDeleteIdleRooms(time.Minute * 10)
+
   return server
 }
 
@@ -477,5 +479,19 @@ func (s *SuperghostServer) votekick(w http.ResponseWriter, r *http.Request) {
 
     default:
       http.Error(w, "", http.StatusMethodNotAllowed)
+  }
+}
+
+func (s *SuperghostServer) periodicallyDeleteIdleRooms(period time.Duration) {
+  ticker := time.NewTicker(period)
+  defer ticker.Stop()
+
+  for {
+    <-ticker.C
+    for key, rw := range s.Rooms {
+      if time.Since(rw.Room.LastTouch()) > period {
+        delete(s.Rooms, key)
+      }
+    }
   }
 }
