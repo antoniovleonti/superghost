@@ -221,6 +221,8 @@ input[name="prefix"] { text-align: right; }
 </body>
 
 <script>
+"use strict";
+
 {{template "ClientUtils" .}}
 
 // Static displays
@@ -232,7 +234,6 @@ const playersTable =
     document.getElementById("players-table").getElementsByTagName("tbody")[0];
 const configDialog = document.getElementById("config-dialog");
 const configSpan = document.getElementById("config-span");
-var config;
 
 // Static actions
 const affixForm = document.getElementById("affix-form");
@@ -265,6 +266,7 @@ readyUpButton.addEventListener(
 // Server-side rendered constants
 const kMyUsername = "{{.Username}}";
 const kRoomID = "{{.RoomID}}";
+var config;
 
 /***** RENDERING / POPULATING ELEMENTS *****/
 
@@ -273,7 +275,7 @@ function populatePlayers(players, currentPlayerUsername,
                          currentPlayerDeadline) {
   playersTable.innerHTML = "";
   for (const p of players) {
-    isMe = p.Username == kMyUsername;
+    let isMe = p.Username == kMyUsername;
     let row = playersTable.insertRow();
 
     let usernameCell = row.insertCell();
@@ -309,7 +311,7 @@ function appendToGameLog(logFlush) {
   let isScrolledToBottom =
       logOL.scrollHeight - logOL.clientHeight <= logOL.scrollTop + 1;
   for (const lf of logFlush) {
-    newLI = document.createElement("li");
+    let newLI = document.createElement("li");
     newLI.innerHTML = lf;
     logOL.appendChild(newLI);
   }
@@ -332,19 +334,29 @@ function appendToChat(msg) {
 }
 
 // Enable / disable & hide / show buttons according to whose turn it is.
-function updateButtons(isMyTurn, state) {
+function updateButtons(room) {
   // Hide one, show the other
-  affixForm.style.display = state != "rebut" ? 'block' : 'none';
-  rebutForm.style.display = state == "rebut" ? 'block' : 'none';
+  let isMyTurn = room.CurrentPlayerUsername == kMyUsername;
+
+  let myPlayer;
+  for (const p of room.Players) {
+    if (p.Username == kMyUsername) myPlayer = p;
+  }
+
+  affixForm.style.display = room.State != "rebut" ? 'block' : 'none';
+  rebutForm.style.display = room.State == "rebut" ? 'block' : 'none';
 
   for (const f of [affixForm, rebutForm]) {
     for (const e of f.elements) {
-      e.disabled = !isMyTurn || state == "insufficient players";
+      e.disabled = !isMyTurn || room.State == "waiting to start";
     }
   }
-  challengeContButton.disabled = challengeIsWordButton.disabled =
-      !(state == "edit" && isMyTurn);
-  concedeButton.disabled = state == "insufficient players";
+  challengeContButton.disabled = !(room.State == "edit" && isMyTurn);
+  challengeIsWordButton.disabled = !(room.State == "edit" && isMyTurn) ||
+                                   config.MinWordLength > room.Stem.length;
+
+  concedeButton.disabled = room.State == "waiting to start" &&
+                           !myPlayer.IsEliminated;
 }
 
 // Write a short sentence describing the state of the game to the screen.
@@ -377,7 +389,7 @@ function writeStem(stem) {
 function renderGameState(room) {
   let deadline = Date.parse(room.CurrentPlayerDeadline)
   populatePlayers(room.Players, room.CurrentPlayerUsername, deadline);
-  updateButtons(room.CurrentPlayerUsername == kMyUsername, room.State);
+  updateButtons(room);
   writeShortStatus(room.CurrentPlayerUsername, room.LastPlayerUsername,
                    room.State);
   writeStem(room.Stem);
@@ -425,8 +437,8 @@ showConfigButton.addEventListener(
 
 function getConfig() {
   sendHTTPRequest(
-      "GET", ()=>kRoomID + "/config", dataFn=null, onloadFn=function(xhr) {
-        let config = JSON.parse(xhr.responseText);
+      "GET", ()=>kRoomID + "/config", null, function(xhr) {
+        config = JSON.parse(xhr.responseText);
         console.log(config);
         for (const k in config) {
           configSpan.innerHTML += k + ": " + config[k] + "<br>";
