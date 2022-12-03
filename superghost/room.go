@@ -549,8 +549,10 @@ func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
 }
 
 func (r *Room) endTurn() {
-  r.endTurnCh<-true // This will stop the countdown thread
-  r.pm.currentPlayer().timeRemaining = time.Until(r.pm.currentPlayerDeadline)
+  if r.config.PlayerTimePerWord > 0 {
+    r.endTurnCh<-true // This will stop the countdown thread
+    r.pm.currentPlayer().timeRemaining = time.Until(r.pm.currentPlayerDeadline)
+  }
 }
 
 func (r *Room) removePlayer(username string) error {
