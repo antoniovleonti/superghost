@@ -21,7 +21,8 @@ func validateWord(word string, usedWords map[string]bool, allowRepeats bool) (
   if _, ok := usedWords[word]; !allowRepeats && ok {
     return false, fmt.Errorf("word has already been used")
   }
-  reqUri := "https://api.dictionaryapi.dev/api/v2/entries/en/" + word
+  // https://github.com/ngocsangyem/freedictionaryapi
+  reqUri := "https://api.freedictionary.dev/api/v2/entries/en/" + word
   resp, err := http.Get(reqUri)
   if err != nil {
     return false, err
