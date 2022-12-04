@@ -355,6 +355,8 @@ func (r *Room) AffixWord(
 
 func (r *Room) newRoundOrGame() {
   r.stem = ""
+  r.state = kEdit
+
   if weHaveAWinner, winner := r.pm.onlyOnePlayerNotEliminated();
       r.pm.numReadyPlayers() < 2 || weHaveAWinner {
     if weHaveAWinner {
