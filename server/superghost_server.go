@@ -62,7 +62,7 @@ func (s *SuperghostServer) home(w http.ResponseWriter, r *http.Request) {
   switch r.Method {
 
     case http.MethodGet:
-      t, err := template.ParseFiles("../client/index.html",
+      t, err := template.ParseFiles("../client/index2.html",
                                     "../client/client_utils.js")
       if err != nil {
         http.Error(w, "unexpected error", http.StatusInternalServerError)
@@ -196,7 +196,7 @@ func (s *SuperghostServer) join(w http.ResponseWriter, r *http.Request) {
 
   if _, ok := roomWrapper.Room.GetValidCookie(r.Cookies()); ok {
     // they've already joined -- redirect them back to the room
-    http.Redirect(w, r, fmt.Sprintf("/rooms/%s", roomID), http.StatusFound)
+    redirectURIList(w, []string{"/rooms/%s" + roomID})
     return
   }
   switch r.Method {
