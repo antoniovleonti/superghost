@@ -2,31 +2,104 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<style>
+
+* { font-family: baskerville; }
+
+h1 {
+  margin: 0px;
+}
+h2, h3, h4, h5, h6 {
+  margin-top: 0px;
+}
+
+th { text-align: left; }
+
+div { border: none; }
+
+/***** CLASSES *****/
+
+.section {
+  margin-bottom: 20px;
+  border-top: solid 1px;
+}
+
+.header-link {
+  color: black;
+  margin-right: 8px;
+}
+
+/***** GRID & GRID CONTAINERS *****/
+
+#head {
+  height: 108px;
+  border-top: none;
+}
+
+.error {
+  color: red;
+}
+
+@media (min-width: 934px) {
+
+#wrapper {
+  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(3, 288px);
+  grid-template-rows: repeat(6, 108px);
+  gap: 20px 34px;
+}
+
+#head {
+  grid-column: 1 / -1;
+  grid-row: 1 / 2;
+}
+
+#join-game {
+  grid-column: 1 / 1;
+  grid-row: 2 / 3;
+}
+
+}
+
+</style>
+
 <head>
 <title>Join game</title>
 </head>
 
 <body>
+  <div id=wrapper>
 
-<h1>SUPERGHOST</h1>
-<h2>Join {{.RoomID}}</h2>
-<form id=join-form>
-  Enter a username:
-  <br><input type=text name=username maxlength=16 pattern="[a-zA-Z0-9]+"
-      autocapitalize=none autocorrect=false>
-  <input type=submit>
-</form>
-<span id=status></span>
+    <div id=head class=section>
+      <h1>SUPERGHOST</h1>
+      <a class=header-link href="/">home</a>
+      <a class=header-link href="/how-to-play">how to play</a>
+      <a class=header-link href="/about">about</a>
+    </div>
 
-<!-- listing players here would be nice so players know what names are taken -->
+    <div id=join-game class=section>
+      <h2>Join room {{.RoomID}}</h2>
+      <form id=join-form>
+        <label for=username>Username:</label>
+        <input type=text name=username><br>
+        <input type=submit value=Join>
+        <span id=join-err class=error></span>
+      </form>
+    </div>
+
+    <!-- listing players here would be nice so players know what names are
+         taken -->
+  </div>
 </body>
 
 <script>
+
 const kRoomID = "{{.RoomID}}";
 {{template "ClientUtils" .}}
 
 const joinForm = document.getElementById("join-form");
-const status = document.getElementById("status");
+const joinErr = document.getElementById("join-err");
 
 joinForm.addEventListener(
     "submit", getHTTPRequester(

@@ -7,13 +7,23 @@
 
 * { font-family: baskerville; }
 
-h1, h2, h3, h4, h5, h6 { margin: 0px; }
+h1 {
+  margin: 0px;
+}
+h2, h3, h4, h5, h6 {
+  margin-top: 0px;
+}
 
 th { text-align: left; }
 
 div { border: none; }
 
 /***** CLASSES *****/
+
+.section {
+  margin-bottom: 20px;
+  border-top: solid 1px;
+}
 
 .scrollable-zebra {
   list-style-type: none;
@@ -32,7 +42,9 @@ div { border: none; }
   padding: 2px 5px;
 }
 
-.bottom-div { height: calc(100% - 32px - 28px); }
+.bottom-div {
+  height: 128px;
+}
 
 .header-link {
   color: black;
@@ -43,6 +55,42 @@ div { border: none; }
 
 #wrapper {
   justify-content: center;
+}
+
+#head {
+  height: 108px;
+  border-top: none;
+}
+
+#players-table { width: 100%; }
+
+/***** CONTENT *****/
+
+#actions-panel {
+  text-align: center;
+}
+#affix-form, #rebut-form {
+  font-size: 24px;
+  margin: 0px;
+}
+input[name="prefix"] { text-align: right; }
+
+#chat-form input[type=text] { width: 75% }
+
+#config {
+  float: right;
+}
+#config dialog {
+  text-align: left;
+}
+
+@media (min-width: 934px) {
+
+.bottom-div {
+  height: calc(100% - 60px);
+}
+
+#wrapper {
   display: grid;
   grid-template-columns: repeat(3, 288px);
   grid-template-rows: repeat(6, 108px);
@@ -64,15 +112,6 @@ div { border: none; }
   width: 32px;
 }
 
-#config {
-  grid-column: -1 / -2;
-  grid-row: 2 / 4;
-  text-align: right;
-}
-#config dialog {
-  text-align: left;
-}
-
 #log {
   border-top: solid 1px;
   grid-column: 1 / 2;
@@ -91,49 +130,15 @@ div { border: none; }
   grid-row: 4 / -1;
 }
 
-/***** CONTENT *****/
-
 #players-table-wrapper {
   height: auto;
   max-height: calc(100% - 32px - 28px);
 }
-#players-table { width: 100%; }
 
-#chat-ol { height: calc(100% - 32px - 16px - 28px - 21px); }
-
-#actions-panel {
-  margin-top: 32px;
-  text-align: center;
+#chat-ol {
+  height: calc(100% - 97px);
 }
-#affix-form, #rebut-form {
-  font-size: 24px;
-  margin: 0px;
-}
-input[name="prefix"] { text-align: right; }
 
-#chat-form input[type=text] { width: 75% }
-
-@media (max-width: 934px) {
-
-  #wrapper {
-    grid-template-columns: auto;
-    grid-template-rows: repeat(9, 108px);
-  }
-
-  #log{
-    grid-column: 1 / -1;
-    grid-row: 4 / 6;
-  }
-
-  #chat{
-    grid-column: 1 / -1;
-    grid-row: 6 / 8;
-  }
-
-  #players{
-    grid-column: 1 / -1;
-    grid-row: 8 / -1;
-  }
 }
 
 </style>
@@ -143,15 +148,28 @@ input[name="prefix"] { text-align: right; }
 <body>
   <div id=wrapper>
 
-    <div id=head>
+    <div id=head class=section>
       <h1>SUPERGHOST</h1>
       <a class=header-link href="/">home</a>
       <a class=header-link href="/how-to-play">how to play</a>
       <a class=header-link href="/about">about</a>
     </div>
 
-    <div id=play>
+    <div id=play class=section>
+
+      <div id=config>
+        <button id=show-config-button>Show game rules</button>
+          <dialog id=config-dialog>
+            <h2>Game rules</h2>
+            <span id=config-span></span>
+            <form method=dialog>
+              <button id=hide-config-button>Hide</button>
+            </form>
+          </dialog>
+      </div>
+
       <h2>Play</h2>
+
       <span id=short-status>Short status.</span>
 
       <div id=actions-panel>
@@ -171,41 +189,14 @@ input[name="prefix"] { text-align: right; }
               autocorrect=off autocapitalize=none><br>
           <button type=submit id=affixButton>Submit continuation</button>
         </form>
-        <i>- or -</i><br><br>
+        <i>- or -</i><br>
         <button type=button id=concede>Concede</button>
         <button type=button id=ch-cont>Challenge (continutation)</button>
         <button type=button id=ch-word>Challenge (this is a valid word)</button>
       </div>
     </div>
 
-    <div id=config>
-      <button id=show-config-button>Show game rules</button>
-        <dialog id=config-dialog>
-          <h2>Game rules</h2>
-          <span id=config-span></span>
-          <form method=dialog>
-            <button id=hide-config-button>Hide</button>
-          </form>
-        </dialog>
-    </div>
-
-    <div id=log>
-      <h2>Game log</h2>
-      <ol id=log-ol class="bottom-div scrollable-zebra">
-      </ol>
-    </div>
-
-    <div id=chat>
-      <h2>Chat</h2>
-      <ol id=chat-ol class="bottom-div scrollable-zebra">
-      </ol>
-      <form id=chat-form>
-        <input type=text name=content>
-        <button type=submit>Send</button>
-      </form>
-    </div>
-
-    <div id=players>
+    <div id=players class=section>
       <h2>Players</h2>
       <div id=players-table-wrapper class="bottom-div scrollable-zebra">
       <table id=players-table>
@@ -216,6 +207,24 @@ input[name="prefix"] { text-align: right; }
       </table>
       </div>
     </div>
+
+
+    <div id=log class=section>
+      <h2>Game log</h2>
+      <ol id=log-ol class="bottom-div scrollable-zebra">
+      </ol>
+    </div>
+
+    <div id=chat class=section>
+      <h2>Chat</h2>
+      <ol id=chat-ol class="bottom-div scrollable-zebra">
+      </ol>
+      <form id=chat-form>
+        <input type=text name=content>
+        <button type=submit>Send</button>
+      </form>
+    </div>
+
 
   </div>
 </body>
