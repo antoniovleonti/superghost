@@ -10,7 +10,7 @@
 h1 {
   margin: 0px;
 }
-h2, h3, h4, h5, h6 {
+h2 {
   margin-top: 0px;
 }
 
@@ -47,18 +47,19 @@ div { border: none; }
   margin-right: 8px;
 }
 
-
 #wrapper {
   justify-content: center;
 }
 
+/* set up linear order since in the markup they are ordered by column */
 #head {
   height: 108px;
   border-top: none;
+  order: 0;
 }
 
 #rooms-table-wrapper {
-  height: calc(100% - 49px);
+  height: 200px;
 }
 #rooms-table { width: 100%; }
 
@@ -71,42 +72,23 @@ div { border: none; }
 #wrapper {
   display: grid;
   grid-template-columns: repeat(3, 288px);
-  grid-template-rows: repeat(6, 108px);
+  grid-template-rows: 108px, auto;
   gap: 20px 34px;
 }
 
 #head {
   grid-column: 1 / -1;
-  grid-row: 1 / 1;
+  grid-row: 1;
 }
 
-#game-browser {
-  grid-column: 1 / 3;
-  grid-row: 2 / 4;
+#left-col {
+  grid-column: 1 / span 2;
+  grid-row: 2;
 }
 
-#join-game {
-  grid-column: -2 /-1;
-  grid-row: 2 / 3;
-}
-
-#server-info {
-  grid-column: -2 /-1;
-  grid-row: 5 / 7;
-}
-
-#create-game {
-  grid-column: -2 / -1;
-  grid-row: 3 / 5;
-}
-
-#what-is-superghost {
-  grid-column: 1 / -2;
-  grid-row: 4 / 7;
-}
-
-#what-is-superghost-body {
-  columns: 2;
+#right-col {
+  grid-column: 3;
+  grid-row: 2;
 }
 
 }
@@ -125,17 +107,7 @@ div { border: none; }
       <a class=header-link href="/about">about</a>
     </div>
 
-    <div id=join-game class=section>
-      <h2>Join a room</h2>
-      <form id=join-room-form>
-        <label for=room-id>Room ID:</label>
-        <input type=text name=room-id><br>
-        <label for=username>Username:</label>
-        <input type=text name=username>
-        <input type=submit value=Join>
-        <span id=join-err class=error></span>
-      </form>
-    </div>
+    <div id=left-col>
 
     <div id=game-browser class=section>
       <h2>Browse public rooms</h2>
@@ -157,6 +129,40 @@ div { border: none; }
           </tbody>
         </table>
       </div>
+    </div>
+
+    <div id=what-is-superghost class=section>
+      <h2>What is superghost?</h2>
+      Superghost (also known as Lexicant) is a word game where two or more players
+      take turns adding letters to a word stem. The first player to spell a
+      valid word loses the round. Players can also challenge if they believe a
+      valid word cannot be spelled with the current word stem.<br>
+      <h3>What's the point of this website?</h3>
+      One of the great things about superghost is that it can be played with no
+      materials. Most people, even those who aren't especially wordy, can
+      easily play without pencil and paper. Accessibility was not a motivation
+      for creating the website. The most important one is just that I wanted to
+      and knew I would learn a lot.  Still, there are benefits to playing on
+      the website, however. For example, you can enjoy a very intense,
+      competitive experience when playing with a clock. Also, if you don't have
+      any friends who enjoy playing superghost, you can meet people here to
+      play and chat with in public games.
+    </div>
+
+    </div><!-- left-col -->
+
+    <div id=right-col>
+
+    <div id=join-game class=section>
+      <h2>Join a room</h2>
+      <form id=join-room-form>
+        <label for=room-id>Room ID:</label>
+        <input type=text name=room-id><br>
+        <label for=username>Username:</label>
+        <input type=text name=username>
+        <input type=submit value=Join>
+        <span id=join-err class=error></span>
+      </form>
     </div>
 
     <div id=create-game class=section>
@@ -181,28 +187,6 @@ div { border: none; }
       </form>
     </div>
 
-    <div id=what-is-superghost class=section>
-    <h2>What is superghost?</h2>
-    <div id=what-is-superghost-body>
-    Superghost is a word game where players take turns adding one letter to the
-    beginning or end of a word stem. Players avoid spelling a valid word while
-    at all times ensuring (or bluffing) that the letter they add spells part of
-    a valid word.<br>
-    Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium
-    doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore
-    veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim
-    ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia
-    consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. Neque
-    porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur,
-    adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore
-    et dolore magnam aliquam quaerat voluptatem. Ut enim ad minima veniam, quis
-    nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid
-    ex ea commodi consequatur? Quis autem vel eum iure reprehenderit qui in ea
-    voluptate velit esse quam nihil molestiae consequatur, vel illum qui
-    dolorem eum fugiat quo voluptas nulla pariatur?
-    </div>
-    </div>
-
     <div id=server-info class=section>
       <h2>Server info</h2>
       Time created: --<br>
@@ -210,6 +194,7 @@ div { border: none; }
       Players: --<br>
     </div>
 
+    </div> <!-- right-col -->
   </div>
 </body>
 
