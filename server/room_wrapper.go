@@ -2,6 +2,8 @@ package sgserver
 
 import (
   "superghost"
+  "fmt"
+  "time"
 )
 
 type RoomWrapper struct {
@@ -34,7 +36,7 @@ func (rw *RoomWrapper) BroadcastGameState() {
   }
   s := string(b)
   // For debugging purposes, print the game state
-  fmt.Println(time.Now() + ": "  + b)
+  fmt.Println(time.Now().String() + ": "  + s)
   rw.UpdateListeners.Broadcast(s)
 }
 
