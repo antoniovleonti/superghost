@@ -17,9 +17,9 @@ type SuperghostServer struct {
   Router chi.Router
 }
 
-func NewSuperghostServer() *SuperghostServer {
+func NewSuperghostServer(rooms map[string]*RoomWrapper) *SuperghostServer {
   server := new(SuperghostServer)
-  server.Rooms = make(map[string]*RoomWrapper)
+  server.Rooms = rooms
 
   server.Router = chi.NewRouter()
   server.Router.Get("/", server.home)

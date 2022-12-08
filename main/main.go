@@ -6,7 +6,8 @@ import (
 )
 
 func main() {
-  server := sgserver.NewSuperghostServer()
+  rooms := make(map[string]*sgserver.RoomWrapper)
+  server := sgserver.NewSuperghostServer(rooms)
   http.ListenAndServe(":9090", server.Router)
 }
 
