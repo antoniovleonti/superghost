@@ -33,6 +33,8 @@ func (rw *RoomWrapper) BroadcastGameState() {
     panic("couldn't get json room state") // something's gone terribly wrong
   }
   s := string(b)
+  // For debugging purposes, print the game state
+  fmt.Println(time.Now() + ": "  + b)
   rw.UpdateListeners.Broadcast(s)
 }
 
