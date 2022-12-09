@@ -8,6 +8,7 @@ import (
 func main() {
   rooms := make(map[string]*sgserver.RoomWrapper)
   server := sgserver.NewSuperghostServer(rooms)
-  http.ListenAndServe(":9090", server.Router)
+  http.ListenAndServeTLS(":443", "../crypto/cert.pem", "../crypto/key.pem",
+                         server.Router)
 }
 
