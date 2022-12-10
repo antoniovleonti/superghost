@@ -333,7 +333,7 @@ func (r *Room) AffixWord(
   if _, ok := r.pm.getInTurnCookie(cookies); !ok {
     return fmt.Errorf("it is not your turn")
   }
-  if !_alphaPattern.MatchString(prefix + suffix) {
+  if !_alphaPattern.MatchString(prefix + suffix) || len(prefix + suffix) > 1{
     return fmt.Errorf(
         "exactly one alphabetical prefix OR suffix must be provided " +
         "(received: {prefix: '%s', suffix: '%s'})", prefix, suffix)

@@ -48,6 +48,10 @@ func (tru *testRoomUtils) readyUpAllPlayers() error {
   return nil
 }
 
+func (tru *testRoomUtils) currentPlayerCookies() []*http.Cookie {
+  return []*http.Cookie{tru.room.pm.currentPlayer().cookie}
+}
+
 func TestReadyUpStartsGame(t *testing.T) {
   tru := newTestRoomUtils(Config {
     MaxPlayers: 16,
@@ -135,5 +139,62 @@ func TestVotekickCurrentPlayer(t *testing.T) {
   // Now make sure the time remaining is not still 30s
   if tru.room.pm.currentPlayerDeadline == preKickDeadline {
     t.Errorf("kicked player's remaining time spilled over to next player")
+  }
+}
+
+func TestAffix(t *testing.T) {
+  tru := newTestRoomUtils(Config {
+    MaxPlayers: 16,
+    MinWordLength: 5,
+    IsPublic: true,
+    EliminationThreshold: 0,
+    AllowRepeatWords: false,
+    PlayerTimePerWord: time.Second * 0,
+  })
+
+  err := tru.addNPlayers(2)
+  if err != nil {
+    t.Errorf("couldn't add two players: " + err.Error())
+  }
+
+  err = tru.readyUpAllPlayers()
+  if err != nil {
+    t.Errorf("couldn't ready up all players: " + err.Error())
+  }
+
+  // Try to affix two letters at once
+  err = tru.room.AffixWord(tru.currentPlayerCookies(), "a", "b")
+  if err == nil {
+    t.Errorf("added both a prefix and suffix")
+  }
+
+  // Try to affix two letters at once
+  err = tru.room.AffixWord(tru.currentPlayerCookies(), "ab", "")
+  if err == nil {
+    t.Errorf("added a prefix or len 2")
+  }
+
+  err = tru.room.AffixWord(tru.currentPlayerCookies(), "", "ab")
+  if err == nil {
+    t.Errorf("added a suffix or len 2")
+  }
+
+  preAffixPlayer := tru.room.pm.currentPlayerUsername()
+  err = tru.room.AffixWord(tru.currentPlayerCookies(), "a", "")
+  if err != nil {
+    t.Errorf("couldn't add valid prefix: " + err.Error())
+  }
+  // make sure current player changes after affixing
+  if preAffixPlayer == tru.room.pm.currentPlayerUsername() {
+    t.Errorf("current player did not increment after affixing letter")
+  }
+
+  err = tru.room.AffixWord(tru.currentPlayerCookies(), "", "b")
+  if err != nil {
+    t.Errorf("couldn't add valid suffix")
+  }
+
+  if tru.room.stem != "AB" {
+    t.Errorf("expected stem to equal \"ab\", got \"%s\"", tru.room.stem)
   }
 }
