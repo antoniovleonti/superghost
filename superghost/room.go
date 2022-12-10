@@ -558,12 +558,20 @@ func (r *Room) endTurn() {
 }
 
 func (r *Room) removePlayer(username string) error {
+  needToStartTurn := false
+  if r.pm.currentPlayerUsername() == username {
+    r.endTurn()
+    needToStartTurn = true
+  }
+  // Player manager handles incrementing current player if needed etc
   err := r.pm.removePlayer(username)
   if err != nil {
     return err
   }
   if r.pm.numReadyPlayers() < 2 {
     r.newRoundOrGame()
+  } else if needToStartTurn {
+    r.startTurnAndCountdown(r.pm.currentPlayerUsername())
   }
   return nil
 }
