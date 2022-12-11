@@ -351,6 +351,9 @@ function updateButtons(room) {
     if (p.Username == kMyUsername) myPlayer = p;
   }
 
+  affixForm.reset(); // remove any previous input
+  rebutForm.reset();
+
   affixForm.style.display = room.State != "rebut" ? 'block' : 'none';
   rebutForm.style.display = room.State == "rebut" ? 'block' : 'none';
 
