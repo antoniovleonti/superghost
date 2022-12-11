@@ -6,7 +6,7 @@ Javascript.
 
 ## Current features:
 - Create rooms
-- Game rule configuration (e.g. keep score, minimum word length, etc.)
+- Configurable game rules
 - Player identity & turn tracking via cookies
 - Concessions
 - Two distinct challenge types
@@ -15,4 +15,4 @@ Javascript.
 - Game clocks (like chess or go)
 
 ## Todo:
-Check Issues page; PRs welcome (especially once this reaches more stable state).
+Check Issues page; PRs welcome.
