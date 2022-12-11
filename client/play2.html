@@ -443,9 +443,13 @@ showConfigButton.addEventListener(
 
 /***** STATE HANDLERS *****/
 
-function getConfigThenCurrentGameState() {
+function getConfigThenEnterGameLoop() {
   sendHTTPRequest(
       "GET", ()=>kRoomID + "/config", null, function(xhr) {
+        if (xhr.status != 200) {
+          // Try again
+          getConfigThenEnterGameLoop();
+        }
         config = JSON.parse(xhr.responseText);
         console.log(config);
         for (const k in config) {
@@ -453,6 +457,7 @@ function getConfigThenCurrentGameState() {
         }
         configSpan.innerHTML += "<br>";
         getCurrentGameState();
+        getNextGameState();
       });
 }
 
@@ -486,8 +491,7 @@ function getNextChat() {
 }
 
 // Enter game loop
-getConfigThenCurrentGameState();
-getNextGameState();
+getConfigThenEnterGameLoop();
 getNextChat();
 
 </script>
