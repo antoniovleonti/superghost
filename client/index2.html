@@ -269,7 +269,8 @@ joinRoomForm.addEventListener(
                            joinErr.innerHTML = err;
                          })));
 
-populateRoomsTable();
+setInterval((e)=>populateRoomsTable(), 1000);
+populateRoomsTable()
 
 </script>
 
