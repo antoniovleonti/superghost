@@ -289,6 +289,7 @@ function populatePlayers(players, currentPlayerUsername,
     let usernameCell = row.insertCell();
     usernameCell.innerHTML = p.Username
     if (isMe) usernameCell.innerHTML += " <i>(you)</i>"
+    if (p.IsEliminated) usernameCell.style.textDecoration = "line-through";
 
     let timeCell = row.insertCell();
     if (p.Username == currentPlayerUsername && currentPlayerDeadline != 0) {
