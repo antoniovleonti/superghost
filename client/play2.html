@@ -372,13 +372,18 @@ function updateButtons(room) {
 
 // Write a short sentence describing the state of the game to the screen.
 function writeShortStatus(nextPlayer, lastPlayer, state) {
-  let nextOrYour = nextPlayer == kMyUsername ? "your" : nextPlayer + "'s";
+  let myTurn = nextPlayer == kMyUsername;
+  let nextOrYour = myTurn ? "your" : nextPlayer + "'s";
   let lastOrYour = lastPlayer == kMyUsername ? "your" : lastPlayer + "'s";
+
+  shortStatus.style.backgroundColor = "white";
   switch (state) {
     case "edit":
+      shortStatus.style.backgroundColor = myTurn ? "aquamarine" : "";
       shortStatus.innerHTML = "It is " + nextOrYour + " turn to add a letter.";
       break;
     case "rebut":
+      shortStatus.style.backgroundColor = myTurn ? "yellow" : "";
       shortStatus.innerHTML = "It is " + nextOrYour + " turn to rebut "
                                   + lastOrYour + " challenge.";
       break;
