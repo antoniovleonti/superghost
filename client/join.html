@@ -37,7 +37,7 @@ div { border: none; }
 }
 
 .error {
-  color: red;
+  background-color: LightPink;
 }
 
 @media (min-width: 934px) {
@@ -105,7 +105,7 @@ joinForm.addEventListener(
     "submit", getHTTPRequester(
         "POST", ()=>"join", ()=>new URLSearchParams(new FormData(joinForm)),
         getDefaultOnload(joinForm, function(err) {
-                           status.innerHTML = err;
+                           joinErr.innerHTML = err;
                          })));
 
 </script>
