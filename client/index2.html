@@ -214,7 +214,7 @@ function populateRoomsTable() {
   sendHTTPRequest("GET", ()=>"rooms", ()=>null, function (xhr) {
     if (xhr.status == 200) {
       let rooms = JSON.parse(xhr.responseText);
-      console.log(rooms);
+      rooms.sort((a, b)=>(a.ID > b.ID) - (a.ID < b.ID))
       roomsTable.innerHTML = "";
 
       if (rooms.length > 0) {
