@@ -214,10 +214,10 @@ function populateRoomsTable() {
   sendHTTPRequest("GET", ()=>"rooms", ()=>null, function (xhr) {
     if (xhr.status == 200) {
       let rooms = JSON.parse(xhr.responseText);
-      rooms.sort((a, b)=>(a.ID > b.ID) - (a.ID < b.ID))
       roomsTable.innerHTML = "";
 
       if (rooms.length > 0) {
+        rooms.sort((a, b)=>(a.ID > b.ID) - (a.ID < b.ID))
         for (const room of rooms) {
           roomsTable.appendChild(createTableRowFromRoom(room));
         }
@@ -269,7 +269,7 @@ joinRoomForm.addEventListener(
                            joinErr.innerHTML = err;
                          })));
 
-setInterval((e)=>populateRoomsTable(), 1000);
+setInterval((e)=>populateRoomsTable(), 5000);
 populateRoomsTable()
 
 </script>
