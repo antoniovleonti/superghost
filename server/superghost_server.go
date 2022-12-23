@@ -45,6 +45,9 @@ func NewSuperghostServer(rooms map[string]*RoomWrapper) *SuperghostServer {
   server.Router.Post("/rooms/{roomID}/chat", server.chat)
   server.Router.Post("/rooms/{roomID}/ready-up", server.readyUp)
   server.Router.Get("/rooms/{roomID}/next-chat", server.chat)
+  server.Router.Post("/rooms/{roomID}/cancellable-leave",
+                     server.cancellableLeave)
+  server.Router.Post("/rooms/{roomID}/cancel-leave", server.cancelLeave)
 
   go server.periodicallyDeleteIdleRooms(time.Minute * 10)
 
@@ -405,6 +408,52 @@ func (s *SuperghostServer) leave(w http.ResponseWriter, r *http.Request) {
       http.Error(w, "", http.StatusMethodNotAllowed)
   }
 }
+
+func (s *SuperghostServer) cancellableLeave(w http.ResponseWriter,
+                                            r *http.Request) {
+  roomID := chi.URLParam(r, "roomID")
+  roomWrapper, ok := s.Rooms[roomID]
+  if !ok {
+    http.NotFound(w, r)
+    return
+  }
+  switch r.Method {
+
+    case http.MethodPost:
+      err := roomWrapper.Room.ScheduleLeave(r.Cookies())
+      if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+      }
+      fmt.Fprintln(w, "you are now scheduled to leave the game")
+
+    default:
+      http.Error(w, "", http.StatusMethodNotAllowed)
+  }
+}
+
+func (s *SuperghostServer) cancelLeave(w http.ResponseWriter, r *http.Request) {
+  roomID := chi.URLParam(r, "roomID")
+  roomWrapper, ok := s.Rooms[roomID]
+  if !ok {
+    http.NotFound(w, r)
+    return
+  }
+  switch r.Method {
+
+    case http.MethodPost:
+      err := roomWrapper.Room.CancelLeaveIfScheduled(r.Cookies())
+      if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+      }
+      fmt.Fprintln(w, "you are no longer scheduled to leave the game")
+
+    default:
+      http.Error(w, "", http.StatusMethodNotAllowed)
+  }
+}
+
 
 func (s *SuperghostServer) config(w http.ResponseWriter, r *http.Request) {
   roomID := chi.URLParam(r, "roomID")

@@ -25,6 +25,9 @@ func newPlayerManager() *playerManager {
 }
 
 func (pm *playerManager) currentPlayerUsername() string {
+  if len(pm.players) == 0 {
+    return ""
+  }
   return pm.players[pm.currentPlayerIdx].username
 }
 

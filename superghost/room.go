@@ -55,8 +55,9 @@ type Room struct {
 
   mutex sync.RWMutex
 
-  endTurnCh chan bool
-  asyncUpdateCh chan<- bool
+  endTurnCh chan struct{}
+  asyncUpdateCh chan<- struct{}
+  usernameToCancelLeaveCh map[string]chan struct{}
 
   lastTouch time.Time
 }
@@ -116,7 +117,7 @@ type JRoomMetadata struct {
   ID string
 }
 
-func NewRoom(config Config, asyncUpdateCh chan<- bool) *Room {
+func NewRoom(config Config, asyncUpdateCh chan<- struct{}) *Room {
   r := new(Room)
 
   r.config = new(Config)
@@ -127,7 +128,11 @@ func NewRoom(config Config, asyncUpdateCh chan<- bool) *Room {
   r.config.PlayerTimePerWord = config.PlayerTimePerWord
 
   r.asyncUpdateCh = asyncUpdateCh
-  r.endTurnCh = make(chan bool)
+  // The default value, but for clarity I am explicitly making this the case.
+  // Iff this is non-nil, a turn is in progress and this channel is being
+  // listened to.
+  r.endTurnCh = nil
+  r.usernameToCancelLeaveCh = make(map[string]chan struct{})
 
   r.pm = newPlayerManager()
   r.waitToStart()
@@ -507,8 +512,13 @@ func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
     return
   }
   timesUp := time.NewTimer(time.Until(r.pm.setCurrentPlayerDeadline()))
+  if r.endTurnCh != nil {
+    panic("trying to start a new turn when the previous one was not finished!")
+  }
+  r.endTurnCh = make(chan struct{})
 
   go func() {
+    defer func() { r.endTurnCh = nil }()
 
     select {
       case <-timesUp.C:
@@ -539,7 +549,8 @@ func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
         }
 
         r.newRoundOrGame()
-        r.asyncUpdateCh<-true // notify the frontend of the update to game state
+        // notify the frontend of the update to game state
+        r.asyncUpdateCh<-struct{}{}
 
       case <-r.endTurnCh:
         // The player beat the clock (and currently has control over the mutex).
@@ -551,8 +562,8 @@ func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
 }
 
 func (r *Room) endTurn() {
-  if r.config.PlayerTimePerWord > 0 {
-    r.endTurnCh<-true // This will stop the countdown thread
+  if r.config.PlayerTimePerWord > 0 && r.endTurnCh != nil {
+    r.endTurnCh<-struct{}{} // This will stop the countdown thread
     r.pm.currentPlayer().timeRemaining = time.Until(r.pm.currentPlayerDeadline)
   }
 }
@@ -607,4 +618,73 @@ func (r *Room) ReadyUp(cookies []*http.Cookie) error {
 func (r *Room) waitToStart() {
   r.state = kWaitingToStart
   r.pm.currentPlayerDeadline = time.Unix(0, 0) // zero time
+}
+
+func (r *Room) ScheduleLeave(cookies []*http.Cookie) error {
+  r.mutex.Lock()
+
+  username, ok := r.pm.getValidCookie(cookies)
+  if !ok {
+    return fmt.Errorf("no credentials provided")
+  }
+
+  // If they are already scheduled to leave, use the previously scheduled time
+  // rather than restarting the countdown.
+  if _, ok := r.usernameToCancelLeaveCh[username]; ok {
+    return fmt.Errorf("player already scheduled to leave")
+  }
+
+  // set up a timer & channel to cancel
+  deadline := time.NewTimer(500 * time.Millisecond)
+  r.usernameToCancelLeaveCh[username] = make(chan struct{})
+
+  r.mutex.Unlock()
+
+  // Create a new thread to wait for the deadline to expire (and kick the player
+  // or for the leave to to be cancelled.
+  go func() {
+    select {
+      case <-deadline.C:
+        r.mutex.Lock()
+        defer r.mutex.Unlock()
+
+        delete(r.usernameToCancelLeaveCh, username)
+
+        err := r.removePlayer(username)
+        if err != nil {
+          // There's really nothing to do with the error here-- the client's
+          // already been given a 200 response
+          return
+        }
+        r.log.flush()
+        r.log.appendLeave(username)
+
+        r.asyncUpdateCh <- struct{}{}
+
+      case <-r.usernameToCancelLeaveCh[username]:
+        deadline.Stop()
+        delete(r.usernameToCancelLeaveCh, username)  // We are done with this
+    }
+  }()
+
+  return nil
+}
+
+func (r *Room) CancelLeaveIfScheduled(cookies []*http.Cookie) error {
+  r.mutex.Lock()
+  defer r.mutex.Unlock()
+
+  username, ok := r.pm.getValidCookie(cookies)
+  if !ok {
+    return fmt.Errorf("no credentials provided")
+  }
+
+  ch, ok := r.usernameToCancelLeaveCh[username]
+  if !ok {
+    return fmt.Errorf("player not scheduled to leave")
+  }
+
+  ch <- struct{}{}
+
+  return nil
 }

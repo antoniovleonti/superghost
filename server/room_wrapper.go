@@ -12,13 +12,13 @@ type RoomWrapper struct {
   UpdateListeners *ListenerGroup
   ChatListeners *ListenerGroup
 
-  asyncUpdateCh chan bool
+  asyncUpdateCh chan struct{}
 }
 
 func NewRoomWrapper(config superghost.Config) *RoomWrapper {
   rw := new(RoomWrapper)
 
-  rw.asyncUpdateCh = make(chan bool)
+  rw.asyncUpdateCh = make(chan struct{})
   rw.Room = superghost.NewRoom(config, rw.asyncUpdateCh)
 
   rw.UpdateListeners = newListenerGroup()

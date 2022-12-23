@@ -9,13 +9,13 @@ import (
 
 type testRoomUtils struct {
   room *Room
-  asyncUpdateCh chan bool
+  asyncUpdateCh chan struct{}
   usernameToCookie map[string]*http.Cookie
 }
 
 func newTestRoomUtils(config Config) *testRoomUtils {
   tru := new(testRoomUtils)
-  tru.asyncUpdateCh = make(chan bool)
+  tru.asyncUpdateCh = make(chan struct{})
   tru.room = NewRoom(config, tru.asyncUpdateCh)
   tru.usernameToCookie = make(map[string]*http.Cookie)
   return tru
@@ -196,5 +196,74 @@ func TestAffix(t *testing.T) {
 
   if tru.room.stem != "AB" {
     t.Errorf("expected stem to equal \"ab\", got \"%s\"", tru.room.stem)
+  }
+}
+
+func TestCancellableLeave(t *testing.T) {
+  tru := newTestRoomUtils(Config {
+    MaxPlayers: 16,
+    MinWordLength: 5,
+    IsPublic: true,
+    EliminationThreshold: 0,
+    AllowRepeatWords: false,
+    PlayerTimePerWord: time.Second * 0,
+  })
+
+  err := tru.addNPlayers(3)
+  if err != nil {
+    t.Errorf("couldn't add two players: " + err.Error())
+  }
+
+  username := "0"
+  player, ok := tru.room.pm.usernameToPlayer[username]
+  if !ok {
+    t.Errorf("couldn't find player 0")
+  }
+  cookies := []*http.Cookie{player.cookie}
+
+  // Leave then cancel, then make sure it actually got cancelled
+  tru.room.ScheduleLeave(cookies)
+  // make sure leave is scheduled
+  if _, ok := tru.room.usernameToCancelLeaveCh[username]; !ok {
+    t.Errorf("cancel leave channel does not exist")
+  }
+  tru.room.CancelLeaveIfScheduled(cookies)
+  if _, ok := tru.room.usernameToCancelLeaveCh[username]; ok {
+    t.Errorf("cancel leave channel was not deleted after cancel")
+  }
+  // Wait and see if player leaves
+  deadline := time.NewTimer(10 * time.Second)
+  select {
+    case <-deadline.C:
+      // Just escape the select statement. Success.
+    case <-tru.asyncUpdateCh:
+      t.Errorf("player left even though CancelLeaveIfScheduled was called")
+  }
+
+  // Leave and don't cancel, then make sure the player eventually leaves
+  tru.room.ScheduleLeave(cookies)
+  // make sure a channel exists to cancel
+  if _, ok := tru.room.usernameToCancelLeaveCh[username]; !ok {
+    t.Errorf("cancel leave channel does not exist (2)")
+  }
+  // Wait and see if player leaves
+  deadline = time.NewTimer(10 * time.Second)
+  select {
+    case <-deadline.C:
+      t.Errorf("scheduled leave did not take effect (or async update channel " +
+               "was not notified if it did)")
+    case <-tru.asyncUpdateCh:
+      // Verify player count is correct
+      if len(tru.room.pm.players) != 2 {
+        t.Errorf("got async update but player count is %d (expected 2)",
+                 len(tru.room.pm.players))
+      }
+      if _, ok := tru.room.pm.usernameToPlayer[username]; ok {
+        t.Errorf("got async update, but player 0 is still in the game")
+      }
+  }
+
+  if _, ok := tru.room.usernameToCancelLeaveCh[username]; ok {
+    t.Errorf("cancel leave channel was not deleted after player left")
   }
 }

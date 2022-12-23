@@ -450,6 +450,9 @@ showConfigButton.addEventListener(
       configDialog.showModal();
     });
 
+window.addEventListener(
+    "pagehide", (e) => navigator.sendBeacon(kRoomID + "/cancellable-leave"))
+
 /***** STATE HANDLERS *****/
 
 function getConfigThenEnterGameLoop() {
@@ -498,6 +501,9 @@ function getNextChat() {
   }
   sendHTTPRequest("GET", ()=>kRoomID + "/next-chat", null, onload);
 }
+
+// If I am scheduled to leave, cancel that
+sendHTTPRequest("POST", () => kRoomID + "/cancel-leave")
 
 // Enter game loop
 getConfigThenEnterGameLoop();
