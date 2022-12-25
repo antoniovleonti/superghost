@@ -70,7 +70,7 @@ type JRoom struct { // publicly visible version of gamestate
   CurrentPlayerDeadline time.Time
   LastPlayerUsername string
   StartingPlayerIdx int
-  LogPush []string
+  LogPush []logItem
 }
 
 func (r *Room) MarshalJSON() ([]byte, error) {
@@ -296,7 +296,7 @@ func (r *Room) RebutChallenge(cookies []*http.Cookie,
   }
 
   r.log.flush()
-  r.log.appendRebuttal(r.pm.currentPlayerUsername(), continuation)
+  r.log.appendRebuttal(r.pm.currentPlayerUsername(), r.stem, prefix, suffix)
   // check if it is a word
   isWord, err := validateWord(continuation, r.usedWords,
                               r.config.AllowRepeatWords)
@@ -348,7 +348,8 @@ func (r *Room) AffixWord(
 
   // update log
   r.log.flush()
-  r.log.appendAffixation(r.pm.currentPlayerUsername(), prefix, r.stem, suffix)
+  r.log.appendAffixation(r.pm.currentPlayerUsername(), strings.ToUpper(prefix),
+                         r.stem, strings.ToUpper(suffix))
 
   r.stem = strings.ToUpper(prefix + r.stem + suffix)
 

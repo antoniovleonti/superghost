@@ -321,11 +321,63 @@ function appendToGameLog(logFlush) {
       logOL.scrollHeight - logOL.clientHeight <= logOL.scrollTop + 1;
   for (const lf of logFlush) {
     let newLI = document.createElement("li");
-    newLI.innerHTML = lf;
+    newLI.innerHTML = stringifyLogItem(lf);
     logOL.appendChild(newLI);
   }
   if (isScrolledToBottom) {
     logOL.scrollTop = logOL.scrollHeight - logOL.clientHeight;
+  }
+}
+
+function stringifyLogItem(logItem) {
+  let i = (s) => "<i>" + s + "</i>";
+  let b = (s) => "<b>" + s + "</b>";
+  let valOrEmpty = (val) => typeof val === "undefined" ? "" : val;
+
+  switch (logItem.Type) {
+    case "Join":
+      return i(logItem.From) + " joined the game!";
+    case "Leave":
+      return i(logItem.From) + " left the game.";
+    case "CallengeIsWord":
+      return i(logItem.From) + " claimed " + i(logItem.To) +
+             " spelled a valid word";
+    case "ChallengeContinuation":
+      return i(logItem.From) + " challenged " + i(logItem.To) +
+             " for a continuation.";
+    case "ChallengeResult":
+      return logItem.Stem + (logItem.Success ? b(" is") : " is " + b("not")) +
+             " a word! +1 " + i(logItem.To) + ".";
+    case "ChallengedPlayerLeft":
+      return i(logItem.From) + " challenged " + i(logItem.To) +
+             ", who left the game.";
+    case "Rebut":
+      return i(logItem.From) + " rebutted with " +
+             b(valOrEmpty(logItem.Prefix)) + logItem.Stem +
+             b(valOrEmpty(logItem.Suffix)) + ".";
+    case "Affix":
+      return i(logItem.From) + " added " + b(valOrEmpty(logItem.Prefix)) +
+             valOrEmpty(logItem.Stem) + b(valOrEmpty(logItem.Suffix)) + ".";
+    case "Concede":
+      return i(logItem.From) + " conceded the round. +1 " +
+             i(logItem.From) + ".";
+    case "Eliminated":
+      return i(logItem.From) + " was eliminated from the game!";
+    case "VoteToKick":
+      return i(logItem.From) + " voted to kick " + i(logItem.To) + ".";
+    case "Kick":
+      return i(logItem.From) + " was kicked from the game.";
+    case "GameOver":
+      return "Game over! " + i(logItem.To) +
+             " won the game! Ready up to play another.";
+    case "GameStart":
+      return "All players ready! Starting game!";
+    case "Timeout":
+      return i(logItem.From) + " ran out of time. +1 " + i(logItem.From) + ".";
+    case "InsufficientPlayers":
+      return "There aren't enough players continue play.";
+    case "ReadyUp":
+      return i(logItem.From) + " is ready.";
   }
 }
 

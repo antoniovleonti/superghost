@@ -267,3 +267,45 @@ func TestCancellableLeave(t *testing.T) {
     t.Errorf("cancel leave channel was not deleted after player left")
   }
 }
+
+func TestGameLoop(t *testing.T) {
+  tru := newTestRoomUtils(Config {
+    MaxPlayers: 16,
+    MinWordLength: 5,
+    IsPublic: true,
+    EliminationThreshold: 0,
+    AllowRepeatWords: false,
+    PlayerTimePerWord: time.Second * 60,
+  })
+
+  err := tru.addNPlayers(2)
+  if err != nil {
+    t.Errorf("couldn't add two players: " + err.Error())
+  }
+
+  err = tru.readyUpAllPlayers()
+  if err != nil {
+    t.Errorf("couldn't ready up all players: " + err.Error())
+  }
+
+  // Try to affix two letters at once
+  err = tru.room.AffixWord(tru.currentPlayerCookies(), "", "s")
+  if err != nil {
+    t.Errorf("couldn't affix (1)")
+  }
+
+  err = tru.room.AffixWord(tru.currentPlayerCookies(), "", "t")
+  if err != nil {
+    t.Errorf("couldn't affix (2)`")
+  }
+
+  err = tru.room.ChallengeContinuation(tru.currentPlayerCookies())
+  if err != nil {
+    t.Errorf("couldn't challenge continuation")
+  }
+
+  err = tru.room.RebutChallenge(tru.currentPlayerCookies(), "te", "ing")
+  if err != nil {
+    t.Errorf("couldn't rebut challenge")
+  }
+}
