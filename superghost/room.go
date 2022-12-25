@@ -518,8 +518,6 @@ func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
   r.endTurnCh = make(chan struct{})
 
   go func() {
-    defer func() { r.endTurnCh = nil }()
-
     select {
       case <-timesUp.C:
         // The player has run out of time
@@ -548,6 +546,7 @@ func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
           r.log.appendElimination(r.pm.currentPlayerUsername())
         }
 
+        r.endTurnCh = nil // Don't need this anymore
         r.newRoundOrGame()
         // notify the frontend of the update to game state
         r.asyncUpdateCh<-struct{}{}
@@ -563,7 +562,8 @@ func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
 
 func (r *Room) endTurn() {
   if r.config.PlayerTimePerWord > 0 && r.endTurnCh != nil {
-    r.endTurnCh<-struct{}{} // This will stop the countdown thread
+    close(r.endTurnCh) // This will stop the countdown thread
+    r.endTurnCh = nil
     r.pm.currentPlayer().timeRemaining = time.Until(r.pm.currentPlayerDeadline)
   }
 }
