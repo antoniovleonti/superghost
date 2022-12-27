@@ -128,6 +128,7 @@ func (s *SuperghostServer) rooms(w http.ResponseWriter, r *http.Request) {
       }
       isPublic := r.FormValue("IsPublic") == "on"
       allowRepeatWords := r.FormValue("AllowRepeatWords") == "on"
+      pauseAtRoundStart := r.FormValue("PauseAtRoundStart") == "on"
 
       playerTimePerWord, err := strconv.Atoi(r.FormValue("PlayerTimePerWord"))
       if err != nil {
@@ -142,6 +143,7 @@ func (s *SuperghostServer) rooms(w http.ResponseWriter, r *http.Request) {
             EliminationThreshold: eliminationThreshold,
             AllowRepeatWords: allowRepeatWords,
             PlayerTimePerWord: time.Duration(playerTimePerWord) * time.Second,
+            PauseAtRoundStart: pauseAtRoundStart,
           })
       redirectURIList(w, []string{"/rooms/" + roomID + "/join"})
       return

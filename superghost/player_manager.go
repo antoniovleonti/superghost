@@ -194,19 +194,19 @@ func (pm *playerManager) numReadyPlayers() int {
   return nReady
 }
 
-func (pm *playerManager) onlyOnePlayerNotEliminated() (bool, string) {
+func (pm *playerManager) onlyOnePlayerNotEliminated() (string, bool) {
   nRemaining := 0
   var winner string
   for _, p := range pm.players {
     if !p.isEliminated {
       nRemaining++
       if nRemaining > 1 {
-        return false, ""
+        return "", false
       }
       winner = p.username
     }
   }
-  return true, winner
+  return winner, true
 }
 
 func (pm *playerManager) setCurrentPlayerDeadline() (time.Time) {
@@ -218,4 +218,8 @@ func (pm *playerManager) resetPlayerTimes(startingTime time.Duration) {
   for _, p :=  range pm.players {
     p.timeRemaining = startingTime
   }
+}
+
+func (pm *playerManager) zeroCurrentPlayerDeadline() {
+  pm.currentPlayerDeadline = time.Unix(0, 0) // zero time
 }

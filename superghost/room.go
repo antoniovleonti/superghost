@@ -35,6 +35,7 @@ type Config struct {
   EliminationThreshold int
   AllowRepeatWords bool
   PlayerTimePerWord time.Duration
+  PauseAtRoundStart bool
 }
 
 type Message struct {
@@ -364,7 +365,7 @@ func (r *Room) newRoundOrGame() {
   r.stem = ""
   r.state = kEdit
 
-  if weHaveAWinner, winner := r.pm.onlyOnePlayerNotEliminated();
+  if winner, weHaveAWinner := r.pm.onlyOnePlayerNotEliminated();
       r.pm.numReadyPlayers() < 2 || weHaveAWinner {
     if weHaveAWinner {
       r.log.appendGameOver(winner)
@@ -378,8 +379,9 @@ func (r *Room) newRoundOrGame() {
   r.pm.incrementStartingPlayer()
   r.pm.currentPlayerIdx = r.pm.startingPlayerIdx
   r.pm.resetPlayerTimes(r.config.PlayerTimePerWord)
+  r.pm.zeroCurrentPlayerDeadline()
 
-  if r.state == kEdit {
+  if !r.config.PauseAtRoundStart && r.state == kEdit {
     r.startTurnAndCountdown(r.pm.currentPlayerUsername())
   }
 }
@@ -612,7 +614,9 @@ func (r *Room) ReadyUp(cookies []*http.Cookie) error {
       r.pm.allPlayersReady() {
     r.state = kEdit
     r.log.appendGameStart()
-    r.startTurnAndCountdown(r.pm.currentPlayerUsername())
+    if !r.config.PauseAtRoundStart {
+      r.startTurnAndCountdown(r.pm.currentPlayerUsername())
+    }
   }
   return nil
 }
