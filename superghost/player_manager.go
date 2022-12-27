@@ -124,7 +124,7 @@ func (pm *playerManager) incrementCurrentPlayer() (ok bool) {
   for i := (pm.currentPlayerIdx + 1) % len(pm.players);
       i != pm.currentPlayerIdx;
       i = (i + 1) % len(pm.players) {
-    if !pm.players[i].isEliminated {
+    if !pm.players[i].isEliminated && pm.players[i].isReady {
       pm.lastPlayerUsername = pm.players[pm.currentPlayerIdx].username
       pm.currentPlayerIdx = i
       return true
@@ -198,7 +198,7 @@ func (pm *playerManager) onlyOnePlayerNotEliminated() (string, bool) {
   nRemaining := 0
   var winner string
   for _, p := range pm.players {
-    if !p.isEliminated {
+    if p.isReady && !p.isEliminated {
       nRemaining++
       if nRemaining > 1 {
         return "", false
