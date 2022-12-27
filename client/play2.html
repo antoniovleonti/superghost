@@ -2,13 +2,15 @@
 <html>
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Ewert" rel="stylesheet">
 
 <style>
 
-* { font-family: baskerville; }
+* { font-family: sans-serif; }
 
 h1 {
   margin: 0px;
+  font-family: "Ewert";
 }
 h2, h3, h4, h5, h6 {
   margin-top: 0px;
@@ -17,6 +19,10 @@ h2, h3, h4, h5, h6 {
 th { text-align: left; }
 
 div { border: none; }
+
+a {
+  color: black;
+}
 
 /***** CLASSES *****/
 
@@ -47,7 +53,6 @@ div { border: none; }
 }
 
 .header-link {
-  color: black;
   margin-right: 8px;
 }
 
@@ -142,13 +147,13 @@ input[name="prefix"] { text-align: right; }
 
 </style>
 
-<head><title>SUPERGHOST</title><head>
+<head><title>rootwords.us</title><head>
 
 <body>
   <div id=wrapper>
 
     <div id=head class=section>
-      <h1>SUPERGHOST</h1>
+      <h1>rootwords.us</h1>
       <a class=header-link href="/">home</a>
       <a class=header-link href="/how-to-play">how to play</a>
       <a class=header-link href="/about">about</a>
@@ -332,6 +337,9 @@ function appendToGameLog(logFlush) {
 function stringifyLogItem(logItem) {
   let i = (s) => "<i>" + s + "</i>";
   let b = (s) => "<b>" + s + "</b>";
+  let def = (word) => "<a href=\"https://en.wiktionary.org/wiki/" +
+                      word.toLowerCase() + "\" target=\"_blank\"" +
+                      " rel=\"noopener noreferrer\">" + word + "</a>";
   let valOrEmpty = (val) => typeof val === "undefined" ? "" : val;
 
   switch (logItem.Type) {
@@ -346,8 +354,12 @@ function stringifyLogItem(logItem) {
       return i(logItem.From) + " challenged " + i(logItem.To) +
              " for a continuation.";
     case "ChallengeResult":
-      return logItem.Stem + (logItem.Success ? b(" is") : " is " + b("not")) +
-             " a word! +1 " + i(logItem.To) + ".";
+      if (logItem.Success) {
+        return def(logItem.Stem) + b(" is") + " a word! +1 " +
+               i(logItem.To) + ".";
+      }
+      return logItem.Stem + " is" + b(" not") + " a word! +1 " +
+             i(logItem.To) + ".";
     case "ChallengedPlayerLeft":
       return i(logItem.From) + " challenged " + i(logItem.To) +
              ", who left the game.";

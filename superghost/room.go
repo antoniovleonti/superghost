@@ -296,7 +296,8 @@ func (r *Room) RebutChallenge(cookies []*http.Cookie,
   }
 
   r.log.flush()
-  r.log.appendRebuttal(r.pm.currentPlayerUsername(), r.stem, prefix, suffix)
+  r.log.appendRebuttal(r.pm.currentPlayerUsername(), r.stem,
+                       strings.ToUpper(prefix), strings.ToUpper(suffix))
   // check if it is a word
   isWord, err := validateWord(continuation, r.usedWords,
                               r.config.AllowRepeatWords)
