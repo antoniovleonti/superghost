@@ -690,3 +690,11 @@ func (r *Room) CancelLeaveIfScheduled(cookies []*http.Cookie) error {
 
   return nil
 }
+
+func (r *Room) Teardown() {
+  // Safely kill any threads
+  for _, ch := range r.usernameToCancelLeaveCh {
+    ch <- struct{}{}
+  }
+  r.endTurn()
+}

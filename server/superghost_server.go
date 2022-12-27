@@ -562,6 +562,7 @@ func (s *SuperghostServer) periodicallyDeleteIdleRooms(period time.Duration) {
     <-ticker.C
     for key, rw := range s.Rooms {
       if time.Since(rw.Room.LastTouch()) > period {
+        s.Rooms[key].Room.Teardown()
         delete(s.Rooms, key)
       }
     }
