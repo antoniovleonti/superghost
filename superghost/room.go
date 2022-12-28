@@ -628,6 +628,7 @@ func (r *Room) waitToStart() {
 
 func (r *Room) ScheduleLeave(cookies []*http.Cookie) error {
   r.mutex.Lock()
+  defer r.mutex.Unlock()
 
   username, ok := r.pm.getValidCookie(cookies)
   if !ok {
@@ -643,8 +644,6 @@ func (r *Room) ScheduleLeave(cookies []*http.Cookie) error {
   // set up a timer & channel to cancel
   deadline := time.NewTimer(500 * time.Millisecond)
   r.usernameToCancelLeaveCh[username] = make(chan struct{})
-
-  r.mutex.Unlock()
 
   // Create a new thread to wait for the deadline to expire (and kick the player
   // or for the leave to to be cancelled.
