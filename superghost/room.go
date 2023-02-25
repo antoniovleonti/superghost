@@ -686,7 +686,7 @@ func (r *Room) CancelLeaveIfScheduled(cookies []*http.Cookie) error {
 
   ch, ok := r.usernameToCancelLeaveCh[username]
   if !ok {
-    return fmt.Errorf("player not scheduled to leave")
+    return nil;
   }
 
   ch <- struct{}{}

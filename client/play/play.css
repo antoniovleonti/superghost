@@ -1,0 +1,363 @@
+:root {
+  --affix-color: #bacfff;
+  --rebut-color: #fff0a6;
+  --affix-gradient-player: linear-gradient(135deg, var(--foreground-color) 0%,
+                                           var(--affix-color) 100%);
+  --rebut-gradient-player: linear-gradient(135deg, var(--foreground-color) 0%,
+                                           var(--rebut-color) 100%);
+  --border-color: darkgrey;
+  --background-color: lightgrey;
+  --midground-color: #e8e8e8;
+  --foreground-color: white;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  margin: 0px;
+  font-size: max(1em, 1vw);
+  font-family: sans-serif;
+  background-color: var(--background-color);
+}
+body > * {
+  background-color: var(--foreground-color);
+}
+
+h1 {
+  font-family: Baskerville, serif;
+  color: black;
+  margin: 0px;
+  line-height: 1.5;
+  text-align: center;
+}
+#head > a {
+  text-decoration: none;
+}
+
+#grid-wrapper {
+  /* Stretch to the bottom of the screen if the content doesn't already */
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  height: 100%;
+  padding-bottom: max(0.3em, 0.75vmin);
+  background-color: var(--background-color);
+}
+#grid-wrapper > * {
+  /* Don't inherit the background color */
+  background-color: var(--foreground-color);
+}
+
+.section, dialog {
+  position: relative;
+  margin: max(0.3em, 0.75vmin);
+  margin-bottom: 0;
+  border-radius: 1vmin;
+  overflow: hidden; /* Prevents content from squaring corners */
+  border: none;
+}
+.section {
+}
+
+#chat .section-content, #game-log .section-content {
+  height: 10em;
+  flex: 1 0 auto;
+}
+
+
+dialog {
+  margin: auto;
+  position: relative;
+}
+
+h2 {
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.5em;
+  margin: 0px;
+  text-align: center;
+  font-size: max(1.5em, 1.5vw);
+  text-transform: uppercase;
+}
+
+.content-container {
+  padding-left: 1em;
+  padding-right: 1em;
+}
+
+ol {
+  overflow-y: scroll;
+  list-style-type: none;
+  padding-left: 0px;
+  margin: 0;
+  background-color: var(--midground-color);
+  width: 100%;
+  height: 100%;
+}
+
+li {
+  background: var(--foreground-color);
+  border-top: 1px solid var(--border-color);
+  padding: 0.25em;
+  overflow-x: hidden;
+  word-break: break-word;
+}
+li:first-of-type {
+  border-top: none;
+}
+
+button, input[type=button], input[type=submit], input[type=reset] {
+  font-size: max(1em, 1vw);
+  background-color: var(--foreground-color);
+  border: 1px solid var(--border-color);
+  padding: 0.25em;
+  margin: 0.25em;
+  cursor: pointer;
+  transition: 0.3s;
+}
+button:disabled, input[type=button]:disabled,
+input[type=submit]:disabled, input[type=reset]:disabled {
+  background-color: var(--midground-color);
+  pointer-events: none;
+  transition: 0.3s;
+}
+.standalone-button {
+  display: block;
+  border-radius: 10vw;
+  padding-left: 0.5em;
+  padding-right: 0.5em;
+}
+button:active, input[type=button]:active,
+    input[type=submit]:active, input[type=reset]:active {
+  background-color: var(--background-color);
+  transition: 0.1s;
+}
+
+#main-panel {
+  text-align: center;
+  padding-top: 2em;
+  padding-bottom: 2em;
+  line-height: 1.5;
+}
+#main-panel .standalone-button {
+  margin-left: auto;
+  margin-right: auto;
+}
+/* Hide sections, buttons, etc. when it's not useful to show them */
+#main-panel:not([data-state="waiting to start"])[data-is-my-turn=true]
+    #spectator-view,
+#main-panel[data-state="waiting to start"] .only-enabled-during-play,
+#main-panel:not([data-state=rebut][data-is-my-turn=true]) #rebut-form,
+#main-panel:not([data-state=edit][data-is-my-turn=true]) #affix-form {
+  display: none;
+  transition: 0.5s;
+}
+
+#rebut-form .stem-display {
+  background: var(--rebut-color);
+  transition: 0.5s;
+}
+#affix-form .stem-display {
+  background: var(--affix-color);
+  transition: 0.5s;
+}
+
+.stem-display {
+  width: 100%;
+}
+
+.players-list-item {
+  padding: 0;
+}
+.players-list-item[data-active-player] {
+  border-left: 4px solid red;
+  transition: 0.3s;
+}
+.players-list-item[data-active-player=edit] .show-player-options {
+  background: var(--affix-gradient-player);
+}
+.players-list-item[data-active-player=rebut] .show-player-options {
+  background: var(--rebut-gradient-player);
+}
+#players, #main-panel {
+  flex-shrink: 0;
+}
+
+.show-player-options, .show-join-form-button {
+  display: grid;
+  grid-template-columns: 50% 50%;
+  margin: 0;
+  width: 100%;
+  border: none;
+  font-size: 1em;
+}
+.show-join-form-button {
+  display: block;
+}
+
+.player-left-column {
+  grid-column: 1;
+  text-align: left;
+}
+.player-right-column {
+  grid-column: 2;
+  font-size: 1.25em;
+  display: flex;
+  align-items: center;
+  justify-content: right;
+  font-family: monospace;
+}
+.username {
+  font-style: italic;
+}
+.player-score {
+  display: inline-block;
+  font-weight: bold;
+  font-family: monospace;
+}
+
+#game-log, #chat {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+#chat-list {
+  height: calc(100% - 3em);
+}
+
+#show-config-button {
+  width: 100%;
+  margin: 0px;
+  border-left: none;
+  border-right: none;
+}
+
+.config-value {
+  float: right;
+  margin-left: 1em;
+}
+
+#chat-form {
+  display: grid;
+  grid-template-columns: auto 3em;
+  height: 3em;
+  border-top: 1px solid var(--border-color);
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+}
+
+#chat-textarea {
+  grid-column: 1;
+  box-sizing: border-box;
+  height: 100%;
+  width: 100%;
+  resize: none;
+  border: none;
+  font-size: inherit;
+  font-family: inherit;
+}
+
+#chat-send {
+  grid-column: 2;
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  border: none;
+  border-left: 1px solid var(--border-color);
+}
+
+.stem {
+  font-family: Baskerville, serif;
+  text-transform: uppercase;
+}
+
+.stem-display {
+  line-height: 2;
+  overflow-x: scroll;
+  white-space: nowrap;
+  display: inline-block;
+  border-radius: 1vmin;
+  background-color: var(--midground-color);
+}
+
+.stem-display > * {
+  font-size: max(1.75em, 3vw);
+  display: inline-block;
+}
+.stem-display input[type=text] {
+  width: 1em;
+  background-color: var(--foreground-color);
+}
+
+span:not(.error):empty:before {
+  content: "\200b"; /* unicode zero width space character */
+}
+span.error {
+  overflow: hidden;
+  position: relative;
+  top: 0;
+  left: 0;
+}
+
+@media (min-width: 52em) {
+  html, body {
+    color: black;
+  }
+  #grid-wrapper {
+    display: grid;
+    gap: 1vmin;
+    padding: 1vmin;
+    margin: 0;
+    grid-template-columns: max(16em, 20vw)
+                           calc(100vw - max(16em, 20vw) * 2 - 4vmin)
+                           max(16em, 20vw);
+    grid-template-rows: repeat(2, calc(50% - 0.5vmin));
+    flex-grow: 1;
+  }
+  #grid-wrapper > * {
+    background-color: var(--foreground-color);
+  }
+  #main-panel {
+    grid-column: 2;
+    grid-row: 1 / -1;
+    height: 100%;
+    width: 100%;
+    border: none;
+    line-height: 4vh;
+    background-color: var(--foreground-color);
+    box-sizing: border-box;
+  }
+  #game-log {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  #players {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+  .section {
+    /* Remove the margin from the mobile version (the grid will fulfill this
+       in the desktop version) */
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .section-content {
+    display: flex;
+    flex-grow: 1;
+    flex-basis: 0;
+    min-height: 0;
+  }
+
+  #chat {
+    grid-column: 3;
+    grid-row: 2;
+  }
+  #chat-form {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+  }
+}

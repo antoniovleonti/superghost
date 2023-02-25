@@ -28,7 +28,7 @@ type logItem struct {
   Prefix string `json:",omitempty"`
   Suffix string `json:",omitempty"`
   Stem string `json:",omitempty"`
-  Success bool `json:",omitempty"`
+  Success *bool `json:",omitempty"`
 }
 
 type BufferedLog struct {
@@ -64,12 +64,14 @@ func (bl *BufferedLog) appendChallengeIsWord(challenger string,
 
 func (bl *BufferedLog) appendChallengeResult(stem string, isWord bool,
                                              loser string) {
-  bl.history = append(bl.history, logItem{
-                        Type: kChallengeResult,
-                        Stem: stem,
-                        Success: isWord,
-                        To: loser,
-                      })
+  tmp := logItem{
+    Type: kChallengeResult,
+    Stem: stem,
+    Success: new(bool),
+    To: loser,
+  }
+  *tmp.Success = isWord
+  bl.history = append(bl.history, tmp)
 }
 
 func (bl *BufferedLog) appendChallengedPlayerLeft(challenger,

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+
+<link rel='stylesheet' href='/static/play.css'>
+
+<meta name='viewport' content='width=device-width, initial-scale=1.0'>
+
+<head><title>wordy.boo | Play</title><head>
+
+<body>
+
+  <div id=head>
+    <a href='/'>
+      <h1>wordy.boo</h1>
+    </a>
+  </div>
+
+  <div id=config>
+    <button id=show-config-button>
+      Show room info
+    </button>
+    <dialog id=config-dialog>
+      <h3>Room info</h3>
+      <div id=config-span></div>
+      <form method=dialog>
+        <button id=hide-config-button class=standalone-button>Hide</button>
+      </form>
+    </dialog>
+  </div>
+
+  <dialog id=join-dialog>
+    <h3>Join</h3>
+    <form id=join-form>
+      <label for=username>Username:</label>
+      <input type=text name=username><br>
+      <button type=submit id=join-form-submit class=standalone-button>
+        Join
+      </button>
+    </form>
+    <form method=dialog>
+      <button id=hide-join-button class=standalone-button>Spectate</button>
+    </form>
+    <span id=join-err class=error></span>
+  </dialog>
+
+  <div id=grid-wrapper>
+
+    <div id=main-panel
+     class='section content-container'
+     data-state='waiting for players'
+     data-is-my-turn=false>
+
+      <span id=short-status>
+        This is a placeholder status (why hasn't this been updated yet?)
+      </span>
+
+      <div id=spectator-view>
+        <div class=stem-display>
+          <span class='stem active-stem'></span>
+        </div>
+      </div>
+
+      <form id=affix-form>
+
+        <div class=stem-display>
+          <input type=text name=prefix size=1 maxlength=1
+           class='only-enabled-on-my-turn'>
+          <span class='stem active-stem'></span>
+          <input type=text name=suffix size=1 maxlength=1
+           class='only-enabled-on-my-turn'>
+        </div>
+
+        <button type=submit id=affix-letter-submit
+         class='standalone-button only-enabled-on-my-turn'>
+          Affix letter
+        </button>
+        <button type=button id=ch-cont-button
+         class='standalone-button only-enabled-on-my-turn'>
+          Challenge (continutation)
+        </button>
+        <button type=button id=ch-word-button
+         class='standalone-button only-enabled-on-my-turn'>
+          Challenge (this is a valid word)
+        </button>
+      </form>
+
+      <form id=rebut-form>
+
+        <div class=stem-display>
+          <input type=text name=prefix size=1>
+          <span class='stem active-stem'></span>
+          <input type=text name=suffix size=1>
+        </div>
+
+        <button type=submit id=rebut-letter-submit class='standalone-button'>
+          Rebut challenge
+        </button>
+      </form>
+
+      <div class=only-enabled-during-play>
+        <button type=button id=concede-button class=standalone-button>
+          Concede
+        </button>
+      </div>
+    </div>
+
+    <div id=players class=section>
+      <h2>Players</h2>
+
+      <div class=section-content>
+
+        <ol id=players-list></ol>
+
+      </div>
+    </div>
+
+    <div id=game-log class=section>
+      <h2>Game log</h2>
+
+      <div class=section-content>
+
+        <ol id=game-log-list></ol>
+
+      </div>
+
+    </div>
+
+    <div id=chat class=section>
+      <h2>Chat</h2>
+
+      <div class=section-content>
+
+        <ol id=chat-list></ol>
+
+        <form id=chat-form>
+          <textarea name=content id=chat-textarea></textarea>
+          <button id=chat-send type=submit>Send</button>
+        </form>
+
+      </div>
+
+    </div>
+
+  </div> <!--grid-wrapper-->
+
+</body>
+
+<script src='/static/global.js'></script>
+<script src='/static/data.js'></script>
+<!--script src='/static/test_data.js'></script-->
+<script src='/static/render.js'></script>
+<!--script src='/static/test_render.js'></script-->
+<!--script src='/static/test_main.js'></script-->
+<script src='/static/main.js'></script>
+
+</html>

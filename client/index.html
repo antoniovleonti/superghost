@@ -1,96 +1,110 @@
+<!DOCTYPE html>
 <html>
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<head>
-<title>superghost</title>
-</head>
+<head><title>wordy.boo | Home</title><head>
 
 <body>
+  <div id=wrapper>
 
-<h1>SUPERGHOST</h1>
-<h2>Join a room</h2>
-<h3>Join by room ID</h3>
-<form id=join-room-form>
-  <input type=text name=room-id>
-  <input type=submit value=Join>
-  <span id=join-err></span>
-</form>
-<h3>Browse public rooms</h3>
-<table id=rooms-table class=scrollable-zebra>
-  <thead>
-    <tr>
-      <th>ID</th>
-      <th>Players</th>
-      <th>Min word length</th>
-      <th>Elimination threshold</th>
-      <th>Join</th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
+    <div id=head class=section>
+      <a href="/" ><h1>wordy.boo</h1></a>
+    </div>
 
-<form id=create-room-form>
-  <h2>Create a room</h2>
-  <label for=is-public>Publicly visible:</label>
-  <input type=checkbox id=is-public name=IsPublic><br>
-  <label for=allow-repeat-words>Allow repeat words:</label>
-  <input type=checkbox id=allow-repeat-words name=AllowRepeatWords><br>
-  <label for=max-players>Max players:</label>
-  <input type=number id=max-players name=MaxPlayers min=2 max=128><br>
-  <label for=min-length>Min word length:</label>
-  <input type=number id=min-length name=MinWordLength min=2 max=128><br>
-  <label for=elimination-threshold>Elimination threshold:</label>
-  <input type=number id=elimination-threshold name=EliminationThreshold
-      min=0 max=128><br>
-  <label for=player-time-per-word>Player seconds per word:</label>
-  <input type=number id=player-time-per-word name=PlayerTimePerWord
-      min=0 max=128><br>
-  <input type=submit value=Create>
-</form>
+    <div style="background-color:yellow">
+      WORK ZONE!!!<br>
+      NEW DESIGN OTW! This page is intentionally ugly to motivate me to fix it.
+    </div>
 
+    <div id=game-browser class=section>
+      <h2>Browse public rooms</h2>
+      <div id=rooms-table-wrapper class=scrollable-zebra>
+        <table id=rooms-table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Players</th>
+              <th>Min word length</th>
+              <th>Elimination threshold</th>
+              <th>Join</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="5">
+              No public games exist yet. Why not create one and invite a friend?
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id=create-game class=section>
+      <h2>Create a game</h2>
+      <form id=create-room-form>
+        <label for=is-public>Publicly visible:</label>
+        <input type=checkbox id=is-public name=IsPublic><br>
+        <label for=allow-repeat-words>Allow repeat words:</label>
+        <input type=checkbox id=allow-repeat-words name=AllowRepeatWords><br>
+        <label for=max-players>Max players:</label>
+        <input type=number id=max-players name=MaxPlayers min=2 max=128><br>
+        <label for=min-length>Min word length:</label>
+        <input type=number id=min-length name=MinWordLength min=2 max=128><br>
+        <label for=elimination-threshold>Elimination threshold:</label>
+        <input type=number id=elimination-threshold name=EliminationThreshold
+            min=0 max=128><br>
+        <label for=player-time-per-word>Player seconds per word:</label>
+        <input type=number id=player-time-per-word name=PlayerTimePerWord
+            min=0 max=128><br>
+        <label for=pause-at-round-start>Pause timer at round start:</label>
+        <input type=checkbox id=pause-at-round-start name=PauseAtRoundStart><br>
+        <input type=submit value=Create>
+        <span id=create-err class=error></span>
+      </form>
+    </div>
+
+  </div>
 </body>
 
 <script>
-
-{{template "ClientUtils" .}}
+"use strict";
 
 const createRoomForm = document.getElementById("create-room-form")
+const createErr = document.getElementById("create-err")
 const joinRoomForm = document.getElementById("join-room-form")
+const joinErr = document.getElementById("join-err")
 const roomsTable =
     document.getElementById("rooms-table").getElementsByTagName("tbody")[0];
 
-createRoomForm.addEventListener(
-    "submit", getHTTPRequester(
-        "POST", ()=>"rooms",
-        ()=>new URLSearchParams(new FormData(createRoomForm)),
-        getDefaultOnload(createRoomForm)));
-
-joinRoomForm.addEventListener(
-    "submit", getHTTPRequester(
-        "HEAD", ()=>"rooms/" + joinRoomForm.elements["room-id"].value, null,
-        function(xhr) {
-          if (xhr.status == 200) {
-            window.location.href =
-                "rooms/" + joinRoomForm.elements["room-id"].value;
-          } else {
-            document.getElementById("join-err").innerHTML = xhr.responseText;
-          }}));
-
 function populateRoomsTable() {
-  sendHTTPRequest("GET", ()=>"rooms", ()=>null, function (xhr) {
-    if (xhr.status == 200) {
-      let rooms = JSON.parse(xhr.responseText);
-      console.log(rooms);
-      roomsTable.innerHTML = "";
-      for (const room of rooms) {
-        roomsTable.appendChild(createTableRowFromRoom(room));
-      }
-    } else {
-      console.error(xhr.responseText);
-    }
-  });
+  fetch('/rooms')
+      .then(response => {
+        if (response.ok) {
+          return response.json();
+        }
+        response.text().then(txt => {
+          throw new Error(`${response.status} ${txt}`);
+        });
+      })
+      .then(rooms => {
+        roomsTable.innerHTML = "";
+
+        if (rooms.length > 0) {
+          rooms.sort((a, b)=>(a.ID > b.ID) - (a.ID < b.ID))
+          for (const room of rooms) {
+            roomsTable.appendChild(createTableRowFromRoom(room));
+          }
+        } else {
+          roomsTable.innerHTML =
+              // Quick hack
+              "<tr><td colspan='5'>" +
+                "No public games exist yet. Why not create one and invite a " +
+                "friend?" +
+              "</td></tr>";
+          console.log(roomsTable.innerHTML);
+        }
+      })
+      .catch(err => console.error(err));
 }
 
 function createTableRowFromRoom(room) {
@@ -101,7 +115,7 @@ function createTableRowFromRoom(room) {
   row.insertCell().appendChild(document.createTextNode(room.MinWordLength));
   row.insertCell().appendChild(document.createTextNode(
       room.EliminationThreshold));
-  joinButton = document.createElement("button");
+  let joinButton = document.createElement("button");
   joinButton.innerHTML = "Join";
   joinButton.addEventListener(
       "click", ()=>window.location.href = "rooms/" + room.ID);
@@ -109,7 +123,28 @@ function createTableRowFromRoom(room) {
   return row
 }
 
-populateRoomsTable();
+createRoomForm.addEventListener("submit", e => {
+  e.preventDefault();
+  const data = new URLSearchParams(new FormData(createRoomForm));
+  console.log(data.toString());
+  fetch('/rooms', { method: 'POST', body: data, redirect: 'follow' })
+      .then(response => {
+        if (response.redirected) {
+          window.location.href = response.url;
+        }
+        if (!response.ok) {
+          response.text().then(txt => {
+            createErr.innerHTML = `${response.status} ${txt}`;
+          });
+        }
+      })
+      .catch(err => {
+        createErr.innerHTML = err;
+      });
+});
+
+populateRoomsTable()
+setInterval((e)=>populateRoomsTable(), 5000);
 
 </script>
 
