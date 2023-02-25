@@ -22,12 +22,17 @@ func validateWord(word string, usedWords map[string]bool, allowRepeats bool) (
     return false, fmt.Errorf("word has already been used")
   }
   // https://github.com/ngocsangyem/freedictionaryapi
-  reqUri := "https://api.freedictionary.dev/api/v2/entries/en/" + word
-  resp, err := http.Get(reqUri)
+  url := "https://wordsapiv1.p.rapidapi.com/words/" + word
+  req, _ := http.NewRequest("GET", url, nil)
+  req.Header.Add("X-RapidAPI-Key",
+                 "9015d265cemsh86b2210b6f9bf77p125fb9jsne9f77737245d")
+  req.Header.Add("X-RapidAPI-Host", "wordsapiv1.p.rapidapi.com")
+  // Execute the request
+  res, err := http.DefaultClient.Do(req)
   if err != nil {
     return false, err
   }
-  return resp.StatusCode == http.StatusOK, nil
+  return res.StatusCode == http.StatusOK, nil
 }
 
 func newCookie(path string, username string) *http.Cookie {

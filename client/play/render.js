@@ -229,9 +229,10 @@ function logMsgToLI(msg) {
       txt.appendChild(document.createTextNode(" for a continuation."));
       return txt;
 
+// {"Type":"ChallengeResult","To":"Antonio","Stem":"EXHIBIT","Success":true}
     case "ChallengeResult":
       if (msg.Success) {
-        txt.appendChild(define(createStemSpan(msg.Stem)));
+        txt.appendChild(createStemSpan(define(msg.Stem)));
         txt.appendChild(bold(" is"));
       }
       else {
