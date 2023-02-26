@@ -12,5 +12,6 @@ func main() {
   }
 	rooms := make(map[string]*sgserver.RoomWrapper)
 	server := sgserver.NewSuperghostServer(rooms)
+  fmt.Println("Starting server...")
 	http.ListenAndServe(":9090", server.Router)
 }

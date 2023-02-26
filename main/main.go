@@ -20,6 +20,7 @@ func main() {
   rooms := make(map[string]*sgserver.RoomWrapper)
   server := sgserver.NewSuperghostServer(rooms)
 
+  fmt.Println("Starting server...")
   panic(http.ListenAndServeTLS(":443", cert, key, server.Router))
 }
 
