@@ -1,10 +1,11 @@
 package main
 
 import (
-  "net/http"
-  "sgserver"
   "flag"
+  "fmt"
+  "net/http"
   "os"
+  "sgserver"
 )
 
 func main() {
