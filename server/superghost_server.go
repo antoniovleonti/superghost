@@ -20,7 +20,8 @@ type SuperghostServer struct {
   Router chi.Router
 }
 
-func NewSuperghostServer(rooms map[string]*RoomWrapper) *SuperghostServer {
+func NewSuperghostServer(
+    rooms map[string]*RoomWrapper) *SuperghostServer {
   server := new(SuperghostServer)
   server.Rooms = rooms
 

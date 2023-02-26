@@ -8,6 +8,7 @@ import(
   "regexp"
   "time"
   "fmt"
+  "os"
 )
 
 var _usernamePattern *regexp.Regexp
@@ -24,8 +25,7 @@ func validateWord(word string, usedWords map[string]bool, allowRepeats bool) (
   // https://github.com/ngocsangyem/freedictionaryapi
   url := "https://wordsapiv1.p.rapidapi.com/words/" + word
   req, _ := http.NewRequest("GET", url, nil)
-  req.Header.Add("X-RapidAPI-Key",
-                 "9015d265cemsh86b2210b6f9bf77p125fb9jsne9f77737245d")
+  req.Header.Add("X-RapidAPI-Key", os.Getenv("RAPIDAPI_KEY"))
   req.Header.Add("X-RapidAPI-Host", "wordsapiv1.p.rapidapi.com")
   // Execute the request
   res, err := http.DefaultClient.Do(req)

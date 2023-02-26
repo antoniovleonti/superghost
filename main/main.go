@@ -4,6 +4,7 @@ import (
   "net/http"
   "sgserver"
   "flag"
+  "os"
 )
 
 func main() {
@@ -12,6 +13,9 @@ func main() {
     panic("expected 2 positional arguments: <cert> <key>")
   }
   cert, key := flag.Arg(0), flag.Arg(1)
+  if os.Getenv("RAPIDAPI_KEY") == "" {
+    panic("environment variable RAPIDAPI_KEY must be set")
+  }
 
   rooms := make(map[string]*sgserver.RoomWrapper)
   server := sgserver.NewSuperghostServer(rooms)
