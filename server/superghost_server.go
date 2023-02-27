@@ -47,7 +47,6 @@ func NewSuperghostServer(
                      server.votekick)
   server.Router.Get("/rooms/{roomID}/config", server.config)
   server.Router.Post("/rooms/{roomID}/chat", server.chat)
-  server.Router.Post("/rooms/{roomID}/ready-up", server.readyUp)
   server.Router.Get("/rooms/{roomID}/next-chat", server.chat)
   server.Router.Post("/rooms/{roomID}/leave", server.leave)
   server.Router.Post("/rooms/{roomID}/cancellable-leave",
@@ -260,8 +259,8 @@ func (s *SuperghostServer) affix(w http.ResponseWriter, r *http.Request) {
 
     case http.MethodPost:
       r.ParseForm()
-      err := roomWrapper.Room.AffixWord(r.Cookies(), r.FormValue("prefix"),
-                            r.FormValue("suffix"))
+      err := roomWrapper.Room.AffixLetter(r.Cookies(), r.FormValue("prefix"),
+                                          r.FormValue("suffix"))
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
@@ -539,28 +538,6 @@ func (s *SuperghostServer) votekick(w http.ResponseWriter, r *http.Request) {
 
     case http.MethodPost:
       err := roomWrapper.Room.Votekick(r.Cookies(), playerID)
-      if err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
-        return
-      }
-      roomWrapper.BroadcastGameState()
-
-    default:
-      http.Error(w, "", http.StatusMethodNotAllowed)
-  }
-}
-
-func (s *SuperghostServer) readyUp(w http.ResponseWriter, r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
-  switch r.Method {
-
-    case http.MethodPost:
-      err := roomWrapper.Room.ReadyUp(r.Cookies())
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return

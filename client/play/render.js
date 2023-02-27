@@ -27,6 +27,10 @@ function formatDuration(duration, countdown = false) {
   const msPerMin = 6e4;
   const msPerCsec = 10;
 
+  if (duration.getTime() == 0) {
+    return "**:**:**";
+  }
+
   const minutes = duration.getMinutes();
   const seconds = duration.getSeconds();
   const centiseconds = Math.floor(duration.getMilliseconds() / msPerCsec);
@@ -385,7 +389,8 @@ function writeShortStatus(nextPlayer, lastPlayer, state, myUsername) {
       shortStatus.appendChild(document.createTextNode(" challenge."));
       break;
     case "waiting to start":
-      shortStatus.appendChild(document.createTextNode("Waiting to start. "));
+      shortStatus.appendChild(
+          document.createTextNode("Waiting for 2+ players."));
       break;
     default:  // (Indicative of a bug)
       shortStatus.appendChild(document.createTextNode("? (Not implemented)"));

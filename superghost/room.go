@@ -193,6 +193,11 @@ func (r *Room) AddPlayer(username string, path string) (*http.Cookie, error) {
   r.log.flush()
   r.log.appendJoin(username)
 
+  // Start game if enough players have joined
+  if len(r.pm.players) >= 2 {
+    r.state = kEdit
+  }
+
   return cookie, nil
 }
 
@@ -239,7 +244,7 @@ func (r *Room) ChallengeIsWord(cookies []*http.Cookie) error {
     loser = p.username
   }
   r.log.appendChallengeResult(strings.ToUpper(r.stem), isWord, loser)
-  r.newRoundOrGame()
+  r.endRound()
   return nil
 }
 
@@ -266,7 +271,7 @@ func (r *Room) ChallengeContinuation(cookies []*http.Cookie) error {
   if !r.pm.swapCurrentAndLastPlayers() {
     r.log.appendChallengedPlayerLeft(r.pm.currentPlayerUsername(),
                                      r.pm.lastPlayerUsername)
-    r.newRoundOrGame()
+    r.endRound()
     return nil
   }
   r.startTurnAndCountdown(r.pm.currentPlayerUsername())
@@ -323,11 +328,11 @@ func (r *Room) RebutChallenge(cookies []*http.Cookie,
     loser = p.username
   }
   r.log.appendChallengeResult(continuation, isWord, loser)
-  r.newRoundOrGame()
+  r.endRound()
   return nil
 }
 
-func (r *Room) AffixWord(
+func (r *Room) AffixLetter(
     cookies []*http.Cookie, prefix string, suffix string) error {
   r.mutex.Lock()
   defer r.mutex.Unlock()
@@ -361,29 +366,28 @@ func (r *Room) AffixWord(
   return nil
 }
 
-func (r *Room) newRoundOrGame() {
+func (r *Room) endRound() {
   r.stem = ""
   r.state = kEdit
 
+  // Test for end of GAME
   if winner, weHaveAWinner := r.pm.onlyOnePlayerNotEliminated();
-      r.pm.numReadyPlayers() < 2 || weHaveAWinner {
-    if weHaveAWinner {
-      r.log.appendGameOver(winner)
-    } else {
+      len(r.pm.players) < 2 || weHaveAWinner {
+    // Log the reason for the end of game
+    if len(r.pm.players) < 2 {
       r.log.appendInsufficientPlayers()
+    } else if weHaveAWinner {
+      r.log.appendGameOver(winner)
     }
+    // Start a new game
     r.pm.resetScores()
-    r.pm.resetReadiness()
     r.waitToStart()
   }
+  // Start a new round
   r.pm.incrementStartingPlayer()
   r.pm.currentPlayerIdx = r.pm.startingPlayerIdx
   r.pm.resetPlayerTimes(r.config.PlayerTimePerWord)
-  r.pm.zeroCurrentPlayerDeadline()
-
-  if !r.config.PauseAtRoundStart && r.state == kEdit {
-    r.startTurnAndCountdown(r.pm.currentPlayerUsername())
-  }
+  r.pm.clearDeadline()
 }
 
 func (r *Room) Leave(cookies []*http.Cookie) error {
@@ -449,7 +453,7 @@ func (r *Room) Concede(cookies []*http.Cookie) error {
     r.log.appendElimination(username)
   }
 
-  r.newRoundOrGame()
+  r.endRound()
   return nil
 }
 
@@ -515,7 +519,8 @@ func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
   if r.config.PlayerTimePerWord == 0 * time.Second {
     return
   }
-  timesUp := time.NewTimer(time.Until(r.pm.setCurrentPlayerDeadline()))
+  r.pm.updateDeadline()
+  timesUp := time.NewTimer(time.Until(r.pm.currentPlayerDeadline))
   if r.endTurnCh != nil {
     panic("trying to start a new turn when the previous one was not finished!")
   }
@@ -551,7 +556,7 @@ func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
         }
 
         r.endTurnCh = nil // Don't need this anymore
-        r.newRoundOrGame()
+        r.endRound()
         // notify the frontend of the update to game state
         r.asyncUpdateCh<-struct{}{}
 
@@ -565,65 +570,41 @@ func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
 }
 
 func (r *Room) endTurn() {
-  if r.config.PlayerTimePerWord > 0 && r.endTurnCh != nil {
-    close(r.endTurnCh) // This will stop the countdown thread
-    r.endTurnCh = nil
+  if r.config.PlayerTimePerWord > 0 {
+    if r.endTurnCh != nil {
+      close(r.endTurnCh) // This will stop the countdown thread
+      r.endTurnCh = nil
+    }
+    // Update that player's remaining time according to how much time they used
     r.pm.currentPlayer().timeRemaining = time.Until(r.pm.currentPlayerDeadline)
+    // Set the player deadline to something strange to prevent the next player
+    // from ever "inheriting" this player's time
+    r.pm.clearDeadline()
   }
 }
 
 func (r *Room) removePlayer(username string) error {
-  needToStartTurn := false
+  wasActivePlayer := false
   if r.pm.currentPlayerUsername() == username {
     r.endTurn()
-    needToStartTurn = true
+    wasActivePlayer = true
   }
   // Player manager handles incrementing current player if needed etc
   err := r.pm.removePlayer(username)
   if err != nil {
     return err
   }
-  if r.pm.numReadyPlayers() < 2 {
-    r.newRoundOrGame()
-  } else if needToStartTurn {
+  if len(r.pm.players) < 2 {
+    r.endRound()
+  } else if wasActivePlayer && r.pm.doesDeadlineExist() {
     r.startTurnAndCountdown(r.pm.currentPlayerUsername())
-  }
-  return nil
-}
-
-func (r *Room) ReadyUp(cookies []*http.Cookie) error {
-  r.mutex.Lock()
-  defer r.mutex.Unlock()
-
-  // check cookies
-  username, ok := r.pm.getValidCookie(cookies)
-  if !ok {
-    return fmt.Errorf("no credentials provided")
-  }
-  if r.pm.usernameToPlayer[username].isReady == true {
-    return fmt.Errorf("you're already ready")
-  }
-  // ready up
-  r.pm.usernameToPlayer[username].isReady = true
-
-  r.log.flush()
-  r.log.appendReadyUp(username)
-  // if all players are ready, start game (if not started already)
-  if r.state == kWaitingToStart &&
-      len(r.pm.players) >= 2 &&
-      r.pm.allPlayersReady() {
-    r.state = kEdit
-    r.log.appendGameStart()
-    if !r.config.PauseAtRoundStart {
-      r.startTurnAndCountdown(r.pm.currentPlayerUsername())
-    }
   }
   return nil
 }
 
 func (r *Room) waitToStart() {
   r.state = kWaitingToStart
-  r.pm.currentPlayerDeadline = time.Unix(0, 0) // zero time
+  r.pm.clearDeadline()
 }
 
 func (r *Room) ScheduleLeave(cookies []*http.Cookie) error {
@@ -655,14 +636,13 @@ func (r *Room) ScheduleLeave(cookies []*http.Cookie) error {
 
         delete(r.usernameToCancelLeaveCh, username)
 
+        r.log.flush()
         err := r.removePlayer(username)
         if err != nil {
           // There's really nothing to do with the error here-- the client's
           // already been given a 200 response
           return
         }
-        r.log.flush()
-        r.log.appendLeave(username)
 
         r.asyncUpdateCh <- struct{}{}
 
@@ -685,11 +665,9 @@ func (r *Room) CancelLeaveIfScheduled(cookies []*http.Cookie) error {
   }
 
   ch, ok := r.usernameToCancelLeaveCh[username]
-  if !ok {
-    return nil;
+  if ok && ch != nil {
+    ch <- struct{}{}
   }
-
-  ch <- struct{}{}
 
   return nil
 }
@@ -697,7 +675,10 @@ func (r *Room) CancelLeaveIfScheduled(cookies []*http.Cookie) error {
 func (r *Room) Teardown() {
   // Safely kill any threads
   for _, ch := range r.usernameToCancelLeaveCh {
-    ch <- struct{}{}
+    if ch != nil {
+      ch <- struct{}{}
+    }
   }
   r.endTurn()
 }
+

@@ -124,7 +124,7 @@ func (pm *playerManager) incrementCurrentPlayer() (ok bool) {
   for i := (pm.currentPlayerIdx + 1) % len(pm.players);
       i != pm.currentPlayerIdx;
       i = (i + 1) % len(pm.players) {
-    if !pm.players[i].isEliminated && pm.players[i].isReady {
+    if !pm.players[i].isEliminated {
       pm.lastPlayerUsername = pm.players[pm.currentPlayerIdx].username
       pm.currentPlayerIdx = i
       return true
@@ -141,7 +141,7 @@ func (pm *playerManager) incrementStartingPlayer() (ok bool) {
   for i := (pm.startingPlayerIdx + 1) % len(pm.players);
       i != pm.startingPlayerIdx;
       i = (i + 1) % len(pm.players) {
-    if !pm.players[i].isEliminated && pm.players[i].isReady {
+    if !pm.players[i].isEliminated {
       pm.lastPlayerUsername = ""
       pm.startingPlayerIdx = i
       return true
@@ -169,36 +169,20 @@ func (pm *playerManager) resetScores() {
   }
 }
 
-func (pm *playerManager) resetReadiness() {
+func (pm *playerManager) allScoresAreZero() bool {
   for _, p := range pm.players {
-    p.isReady = false
-  }
-}
-
-func (pm *playerManager) allPlayersReady() bool {
-  for _, p := range pm.players {
-    if !p.isReady {
+    if p.score > 0 {
       return false
     }
   }
   return true
 }
 
-func (pm *playerManager) numReadyPlayers() int {
-  nReady := 0
-  for _, p := range pm.players {
-    if p.isReady {
-      nReady++
-    }
-  }
-  return nReady
-}
-
 func (pm *playerManager) onlyOnePlayerNotEliminated() (string, bool) {
   nRemaining := 0
   var winner string
   for _, p := range pm.players {
-    if p.isReady && !p.isEliminated {
+    if !p.isEliminated {
       nRemaining++
       if nRemaining > 1 {
         return "", false
@@ -209,17 +193,21 @@ func (pm *playerManager) onlyOnePlayerNotEliminated() (string, bool) {
   return winner, true
 }
 
-func (pm *playerManager) setCurrentPlayerDeadline() (time.Time) {
-  pm.currentPlayerDeadline = time.Now().Add(pm.currentPlayer().timeRemaining)
-  return pm.currentPlayerDeadline
-}
-
 func (pm *playerManager) resetPlayerTimes(startingTime time.Duration) {
   for _, p :=  range pm.players {
     p.timeRemaining = startingTime
   }
 }
 
-func (pm *playerManager) zeroCurrentPlayerDeadline() {
-  pm.currentPlayerDeadline = time.Unix(0, 0) // zero time
+func (pm *playerManager) updateDeadline() {
+  pm.currentPlayerDeadline = time.Now().Add(pm.currentPlayer().timeRemaining)
+  return
+}
+
+func (pm *playerManager) clearDeadline() {
+  pm.currentPlayerDeadline = time.Unix(0, 0)
+}
+
+func (pm *playerManager) doesDeadlineExist() bool {
+  return pm.currentPlayerDeadline != time.Unix(0, 0)
 }

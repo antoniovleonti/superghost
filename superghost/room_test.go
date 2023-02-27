@@ -21,6 +21,17 @@ func newTestRoomUtils(config Config) *testRoomUtils {
   return tru
 }
 
+func newDefaultTimedNoEliminationTestRoomUtils() *testRoomUtils {
+  return newTestRoomUtils(Config {
+    MaxPlayers: 16,
+    MinWordLength: 5,
+    IsPublic: true,
+    EliminationThreshold: 0,
+    AllowRepeatWords: false,
+    PlayerTimePerWord: time.Second * 60,
+  })
+}
+
 // Adds n players to game named "1", "2", ..
 func (tru *testRoomUtils) addNPlayers(n int) error {
   start := len(tru.room.pm.players)
@@ -35,54 +46,45 @@ func (tru *testRoomUtils) addNPlayers(n int) error {
   return nil
 }
 
-func (tru *testRoomUtils) readyUpAllPlayers() error {
-  for username, cookie := range tru.usernameToCookie {
-    if tru.room.pm.usernameToPlayer[username].isReady {
-      continue
-    }
-    err := tru.room.ReadyUp([]*http.Cookie{cookie})
-    if err != nil {
-      return err
-    }
-  }
-  return nil
-}
-
 func (tru *testRoomUtils) currentPlayerCookies() []*http.Cookie {
   return []*http.Cookie{tru.room.pm.currentPlayer().cookie}
-}
-
-func TestReadyUpStartsGame(t *testing.T) {
-  tru := newTestRoomUtils(Config {
-    MaxPlayers: 16,
-    MinWordLength: 5,
-    IsPublic: true,
-    EliminationThreshold: 0,
-    AllowRepeatWords: false,
-    PlayerTimePerWord: time.Second * 0,
-  })
-
-  err := tru.addNPlayers(2)
-  if err != nil {
-    t.Errorf("couldn't add two players: " + err.Error())
-  }
-
-  err = tru.readyUpAllPlayers()
-  if err != nil {
-    t.Errorf("couldn't ready up all players: " + err.Error())
-  }
-
-  // at this point server will send out the update and users will be notified
-  // if the game started
-  if tru.room.state != kEdit {
-    t.Errorf("didn't enter edit mode")
-  }
 }
 
 func TestGameEndsWhenOnePlayerRemains(t *testing.T) {
 }
 
-func TestVotekickCurrentPlayer(t *testing.T) {
+func TestNoDeadlineAtRoundStart(t *testing.T) {
+  tru := newDefaultTimedNoEliminationTestRoomUtils()
+  err := tru.addNPlayers(2)
+  if err != nil {
+    t.Errorf("couldn't add players: " + err.Error())
+  }
+
+  // Deadline should be zeroed aka no deadline
+  if tru.room.pm.doesDeadlineExist() {
+    t.Errorf("deadline should not be set before first player makes a move")
+  }
+}
+
+func TestDeadlineExistsAfterFirstMove(t *testing.T) {
+  tru := newDefaultTimedNoEliminationTestRoomUtils()
+  err := tru.addNPlayers(2)
+  if err != nil {
+    t.Errorf("couldn't add players: " + err.Error())
+  }
+
+  err = tru.room.AffixLetter(tru.currentPlayerCookies(), "", "b")
+  if err != nil {
+    t.Errorf(err.Error())
+  }
+
+  // First player made a move, deadline should be set now.
+  if !tru.room.pm.doesDeadlineExist() {
+    t.Errorf("deadline should be set after first move of round")
+  }
+}
+
+func TestDeadlineWipedAfterRoundEndAndGameEnd(t *testing.T) {
   tru := newTestRoomUtils(Config {
     MaxPlayers: 16,
     MinWordLength: 5,
@@ -91,7 +93,34 @@ func TestVotekickCurrentPlayer(t *testing.T) {
     AllowRepeatWords: false,
     PlayerTimePerWord: time.Second * 60,
   })
+  err := tru.addNPlayers(2)
+  if err != nil {
+    t.Errorf("couldn't add players: " + err.Error())
+  }
 
+  // Affix, concede until the game is over
+  for tru.room.pm.players[0].score = 1; tru.room.pm.allScoresAreZero(); {
+    if tru.room.pm.doesDeadlineExist() {
+      t.Errorf("deadline should not exist at the beginning of a round")
+    }
+
+    err = tru.room.AffixLetter(tru.currentPlayerCookies(), "", "b")
+    if err != nil {
+      t.Errorf(err.Error())
+    }
+    err = tru.room.Concede(tru.currentPlayerCookies())
+    if err != nil {
+      t.Errorf(err.Error())
+    }
+  }
+
+  if tru.room.pm.doesDeadlineExist() {
+    t.Errorf("deadline should not exist at the beginning of new game")
+  }
+}
+
+func TestVotekickCurrentPlayer(t *testing.T) {
+  tru := newDefaultTimedNoEliminationTestRoomUtils()
   err := tru.addNPlayers(3)
   if err != nil {
     t.Errorf("couldn't add players: " + err.Error())
@@ -101,11 +130,6 @@ func TestVotekickCurrentPlayer(t *testing.T) {
   // remaining time does not spill over to the next person (bug as of time of
   // writing this test). Time starts at 60.
   tru.room.pm.currentPlayer().timeRemaining = 30 * time.Second
-
-  err = tru.readyUpAllPlayers()
-  if err != nil {
-    t.Errorf("couldn't ready up all players: " + err.Error())
-  }
 
   preKickDeadline := tru.room.pm.currentPlayerDeadline
 
@@ -137,50 +161,37 @@ func TestVotekickCurrentPlayer(t *testing.T) {
   }
 
   // Now make sure the time remaining is not still 30s
-  if tru.room.pm.currentPlayerDeadline == preKickDeadline {
+  if tru.room.pm.currentPlayerDeadline != preKickDeadline {
     t.Errorf("kicked player's remaining time spilled over to next player")
   }
 }
 
 func TestAffix(t *testing.T) {
-  tru := newTestRoomUtils(Config {
-    MaxPlayers: 16,
-    MinWordLength: 5,
-    IsPublic: true,
-    EliminationThreshold: 0,
-    AllowRepeatWords: false,
-    PlayerTimePerWord: time.Second * 0,
-  })
-
+  tru := newDefaultTimedNoEliminationTestRoomUtils()
   err := tru.addNPlayers(2)
   if err != nil {
     t.Errorf("couldn't add two players: " + err.Error())
   }
 
-  err = tru.readyUpAllPlayers()
-  if err != nil {
-    t.Errorf("couldn't ready up all players: " + err.Error())
-  }
-
   // Try to affix two letters at once
-  err = tru.room.AffixWord(tru.currentPlayerCookies(), "a", "b")
+  err = tru.room.AffixLetter(tru.currentPlayerCookies(), "a", "b")
   if err == nil {
     t.Errorf("added both a prefix and suffix")
   }
 
   // Try to affix two letters at once
-  err = tru.room.AffixWord(tru.currentPlayerCookies(), "ab", "")
+  err = tru.room.AffixLetter(tru.currentPlayerCookies(), "ab", "")
   if err == nil {
     t.Errorf("added a prefix or len 2")
   }
 
-  err = tru.room.AffixWord(tru.currentPlayerCookies(), "", "ab")
+  err = tru.room.AffixLetter(tru.currentPlayerCookies(), "", "ab")
   if err == nil {
     t.Errorf("added a suffix or len 2")
   }
 
   preAffixPlayer := tru.room.pm.currentPlayerUsername()
-  err = tru.room.AffixWord(tru.currentPlayerCookies(), "a", "")
+  err = tru.room.AffixLetter(tru.currentPlayerCookies(), "a", "")
   if err != nil {
     t.Errorf("couldn't add valid prefix: " + err.Error())
   }
@@ -189,7 +200,7 @@ func TestAffix(t *testing.T) {
     t.Errorf("current player did not increment after affixing letter")
   }
 
-  err = tru.room.AffixWord(tru.currentPlayerCookies(), "", "b")
+  err = tru.room.AffixLetter(tru.currentPlayerCookies(), "", "b")
   if err != nil {
     t.Errorf("couldn't add valid suffix")
   }
@@ -200,15 +211,7 @@ func TestAffix(t *testing.T) {
 }
 
 func TestCancellableLeave(t *testing.T) {
-  tru := newTestRoomUtils(Config {
-    MaxPlayers: 16,
-    MinWordLength: 5,
-    IsPublic: true,
-    EliminationThreshold: 0,
-    AllowRepeatWords: false,
-    PlayerTimePerWord: time.Second * 0,
-  })
-
+  tru := newDefaultTimedNoEliminationTestRoomUtils()
   err := tru.addNPlayers(3)
   if err != nil {
     t.Errorf("couldn't add two players: " + err.Error())
@@ -232,7 +235,7 @@ func TestCancellableLeave(t *testing.T) {
     t.Errorf("cancel leave channel was not deleted after cancel")
   }
   // Wait and see if player leaves
-  deadline := time.NewTimer(10 * time.Second)
+  deadline := time.NewTimer(1 * time.Second)
   select {
     case <-deadline.C:
       // Just escape the select statement. Success.
@@ -268,33 +271,73 @@ func TestCancellableLeave(t *testing.T) {
   }
 }
 
-func TestGameLoop(t *testing.T) {
-  tru := newTestRoomUtils(Config {
-    MaxPlayers: 16,
-    MinWordLength: 5,
-    IsPublic: true,
-    EliminationThreshold: 0,
-    AllowRepeatWords: false,
-    PlayerTimePerWord: time.Second * 60,
-  })
-
+func TestCancellableLeaveToOnePlayerEndsGame(t *testing.T) {
+  tru := newDefaultTimedNoEliminationTestRoomUtils()
   err := tru.addNPlayers(2)
   if err != nil {
     t.Errorf("couldn't add two players: " + err.Error())
   }
 
-  err = tru.readyUpAllPlayers()
+  username := "0"
+  player, ok := tru.room.pm.usernameToPlayer[username]
+  if !ok {
+    t.Errorf("couldn't find player 0")
+  }
+  cookies := []*http.Cookie{player.cookie}
+
+  // Leave then cancel, then make sure it actually got cancelled
+  tru.room.ScheduleLeave(cookies)
+  // make sure leave is scheduled
+  if _, ok := tru.room.usernameToCancelLeaveCh[username]; !ok {
+    t.Errorf("cancel leave channel does not exist")
+  }
+
+  // Leave and don't cancel, then make sure the player eventually leaves
+  tru.room.ScheduleLeave(cookies)
+  // make sure a channel exists to cancel
+  if _, ok := tru.room.usernameToCancelLeaveCh[username]; !ok {
+    t.Errorf("cancel leave channel does not exist")
+  }
+
+  // Wait and see if player leaves
+  deadline := time.NewTimer(1 * time.Second)
+  select {
+    case <-deadline.C:
+      t.Errorf("scheduled leave did not take effect (or async update channel " +
+               "was not notified if it did)")
+    case <-tru.asyncUpdateCh:
+      // Verify player count is correct
+      if len(tru.room.pm.players) != 1 {
+        t.Errorf("got async update but player count is %d (expected 1)",
+                 len(tru.room.pm.players))
+      }
+      if _, ok := tru.room.pm.usernameToPlayer[username]; ok {
+        t.Errorf("got async update, but player 0 is still in the game")
+      }
+  }
+
+  // Now see if game was ended
+  if logItemType := tru.room.log.history[len(tru.room.log.history)-1].Type;
+      logItemType != kInsufficientPlayers {
+    t.Errorf("last log item = %s (expected %s)",
+             logItemType, kInsufficientPlayers)
+  }
+}
+
+func TestGameLoop(t *testing.T) {
+  tru := newDefaultTimedNoEliminationTestRoomUtils()
+  err := tru.addNPlayers(2)
   if err != nil {
-    t.Errorf("couldn't ready up all players: " + err.Error())
+    t.Errorf("couldn't add two players: " + err.Error())
   }
 
   // Try to affix two letters at once
-  err = tru.room.AffixWord(tru.currentPlayerCookies(), "", "s")
+  err = tru.room.AffixLetter(tru.currentPlayerCookies(), "", "s")
   if err != nil {
     t.Errorf("couldn't affix (1)")
   }
 
-  err = tru.room.AffixWord(tru.currentPlayerCookies(), "", "t")
+  err = tru.room.AffixLetter(tru.currentPlayerCookies(), "", "t")
   if err != nil {
     t.Errorf("couldn't affix (2)`")
   }
