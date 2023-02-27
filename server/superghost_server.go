@@ -1,13 +1,14 @@
 package sgserver
 
 import (
+  "context"
   "encoding/json"
-  "path/filepath"
-  "os"
-  "io"
   "fmt"
   "github.com/go-chi/chi/v5"
+  "io"
   "net/http"
+  "os"
+  "path/filepath"
   "strconv"
   "strings"
   "superghost"
@@ -20,38 +21,42 @@ type SuperghostServer struct {
   Router chi.Router
 }
 
-func NewSuperghostServer(
-    rooms map[string]*RoomWrapper) *SuperghostServer {
+func NewSuperghostServer(rooms map[string]*RoomWrapper) *SuperghostServer {
   server := new(SuperghostServer)
   server.Rooms = rooms
 
   server.Router = chi.NewRouter()
+
   server.Router.Get("/", server.home)
   server.Router.Get("/static/*", server.static)
-  server.Router.Get("/rooms", server.rooms)
-  server.Router.Post("/rooms", server.rooms)
-  server.Router.Get("/rooms/{roomID}", server.room)
-  server.Router.Head("/rooms/{roomID}", server.room)
-  server.Router.Post("/rooms/{roomID}/join", server.join)
-  // Gameplay-related endpoints
-  server.Router.Get("/rooms/{roomID}/next-state", server.nextState)
-  server.Router.Get("/rooms/{roomID}/current-state", server.currentState)
-  server.Router.Post("/rooms/{roomID}/affix", server.affix)
-  server.Router.Post("/rooms/{roomID}/challenge-is-word",
-                     server.challengeIsWord)
-  server.Router.Post("/rooms/{roomID}/challenge-continuation",
-                     server.challengeContinuation)
-  server.Router.Post("/rooms/{roomID}/rebuttal", server.rebuttal)
-  server.Router.Post("/rooms/{roomID}/concession", server.concession)
-  server.Router.Post("/rooms/{roomID}/players/{playerID}/votekick",
-                     server.votekick)
-  server.Router.Get("/rooms/{roomID}/config", server.config)
-  server.Router.Post("/rooms/{roomID}/chat", server.chat)
-  server.Router.Get("/rooms/{roomID}/next-chat", server.chat)
-  server.Router.Post("/rooms/{roomID}/leave", server.leave)
-  server.Router.Post("/rooms/{roomID}/cancellable-leave",
-                     server.cancellableLeave)
-  server.Router.Post("/rooms/{roomID}/cancel-leave", server.cancelLeave)
+
+  server.Router.Route("/rooms", func (r chi.Router) {
+    r.Get("/", server.rooms)
+    r.Post("/", server.rooms)
+
+    r.Route("/{roomID}", func(r chi.Router) {
+      // Middleware to verify roomID is valid and add it to request ctx
+      r.Use(server.middlewareGetRoom)
+
+      r.Get("/", server.room)
+      r.Head("/", server.room)
+      r.Post("/join", server.join)
+      r.Get("/next-state", server.nextState)
+      r.Get("/current-state", server.currentState)
+      r.Post("/affix", server.affix)
+      r.Post("/challenge-is-word", server.challengeIsWord)
+      r.Post("/challenge-continuation", server.challengeContinuation)
+      r.Post("/rebuttal", server.rebuttal)
+      r.Post("/concession", server.concession)
+      r.Post("/players/{playerID}/votekick", server.votekick)
+      r.Get("/config", server.config)
+      r.Post("/chat", server.chat)
+      r.Get("/next-chat", server.chat)
+      r.Post("/leave", server.leave)
+      r.Post("/cancellable-leave", server.cancellableLeave)
+      r.Post("/cancel-leave", server.cancelLeave)
+    })
+  })
 
   // go server.periodicallyDeleteIdleRooms(time.Minute * 10)
 
@@ -64,6 +69,19 @@ func redirectURIList(w http.ResponseWriter, URI string) {
 	w.Header().Set("Location", URI)
 	w.WriteHeader(http.StatusFound)
   fmt.Fprint(w, "") // No body, just the header
+}
+
+func (s *SuperghostServer) middlewareGetRoom(next http.Handler) http.Handler {
+  return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		roomID := chi.URLParam(r, "roomID")
+		_, ok := s.Rooms[roomID]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+    ctx := context.WithValue(r.Context(), "roomID", roomID)
+    next.ServeHTTP(w, r.WithContext(ctx))
+  })
 }
 
 func (s *SuperghostServer) static(w http.ResponseWriter, r *http.Request) {
@@ -102,6 +120,7 @@ func (s *SuperghostServer) home(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SuperghostServer) rooms(w http.ResponseWriter, r *http.Request) {
+  fmt.Println("I'm in rooms")
   switch r.Method {
 
     // Send a list of the public games in play
