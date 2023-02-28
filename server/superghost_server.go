@@ -58,7 +58,7 @@ func NewSuperghostServer(rooms map[string]*RoomWrapper) *SuperghostServer {
     })
   })
 
-  // go server.periodicallyDeleteIdleRooms(time.Minute * 10)
+  go server.periodicallyDeleteIdleRooms(time.Minute * 30)
 
   return server
 }
