@@ -633,6 +633,8 @@ func (r *Room) ScheduleLeave(cookies []*http.Cookie) error {
         delete(r.usernameToCancelLeaveCh, username)
 
         r.log.flush()
+        r.log.appendLeave(username)
+
         err := r.removePlayer(username)
         if err != nil {
           // There's really nothing to do with the error here-- the client's
