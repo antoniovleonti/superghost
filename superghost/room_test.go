@@ -231,6 +231,7 @@ func TestCancellableLeave(t *testing.T) {
     t.Errorf("cancel leave channel does not exist")
   }
   tru.room.CancelLeaveIfScheduled(cookies)
+  time.Sleep(10 * time.Millisecond)
   if _, ok := tru.room.usernameToCancelLeaveCh[username]; ok {
     t.Errorf("cancel leave channel was not deleted after cancel")
   }
@@ -350,5 +351,22 @@ func TestGameLoop(t *testing.T) {
   err = tru.room.RebutChallenge(tru.currentPlayerCookies(), "te", "ing")
   if err != nil {
     t.Errorf("couldn't rebut challenge")
+  }
+}
+
+func TestPlayerTimeRemainingAfterFirstMove(t *testing.T) {
+  tru := newDefaultTimedNoEliminationTestRoomUtils()
+  err := tru.addNPlayers(2)
+  if err != nil {
+    t.Errorf("couldn't add two players: " + err.Error())
+  }
+
+  err = tru.room.AffixLetter(tru.currentPlayerCookies(), "", "s")
+  if err != nil {
+    t.Errorf("couldn't affix")
+  }
+
+  if tru.room.pm.players[0].timeRemaining < 0 {
+    t.Errorf("time remaining is less than zero!")
   }
 }

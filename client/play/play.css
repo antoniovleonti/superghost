@@ -293,8 +293,8 @@ button:active, input[type=button]:active,
   width: 1em;
   background-color: var(--foreground-color);
   border: none;
-  margin-right: 0.25em;
-  margin-left: 0.25em;
+  font-family: Baskerville, serif;
+  text-transform: uppercase;
 }
 
 span:not(.error):empty:before {

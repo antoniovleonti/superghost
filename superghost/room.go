@@ -575,11 +575,7 @@ func (r *Room) endTurn() {
       close(r.endTurnCh) // This will stop the countdown thread
       r.endTurnCh = nil
     }
-    // Update that player's remaining time according to how much time they used
-    r.pm.currentPlayer().timeRemaining = time.Until(r.pm.currentPlayerDeadline)
-    // Set the player deadline to something strange to prevent the next player
-    // from ever "inheriting" this player's time
-    r.pm.clearDeadline()
+    r.pm.endTurn()
   }
 }
 

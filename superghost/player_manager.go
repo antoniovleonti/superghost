@@ -204,6 +204,17 @@ func (pm *playerManager) updateDeadline() {
   return
 }
 
+func (pm *playerManager) endTurn() {
+  // Update that player's remaining time according to how much time they used
+  // if the timer was running during their turn
+  if pm.doesDeadlineExist() {
+    pm.currentPlayer().timeRemaining = time.Until(pm.currentPlayerDeadline)
+  }
+  // The deadline is now invalid-- make sure it looks like a bug if it gets
+  // reused (because it is!)
+  pm.clearDeadline()
+}
+
 func (pm *playerManager) clearDeadline() {
   pm.currentPlayerDeadline = time.Unix(0, 0)
 }

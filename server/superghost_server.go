@@ -73,13 +73,15 @@ func redirectURIList(w http.ResponseWriter, URI string) {
 
 func (s *SuperghostServer) middlewareGetRoom(next http.Handler) http.Handler {
   return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		roomID := chi.URLParam(r, "roomID")
-		_, ok := s.Rooms[roomID]
+		ID := chi.URLParam(r, "roomID")
+		wrapper, ok := s.Rooms[ID]
 		if !ok {
 			http.NotFound(w, r)
 			return
 		}
-    ctx := context.WithValue(r.Context(), "roomID", roomID)
+    ctx := context.WithValue(r.Context(), "roomID", ID)
+    ctx = context.WithValue(ctx, "roomWrapper", wrapper)
+
     next.ServeHTTP(w, r.WithContext(ctx))
   })
 }
@@ -120,7 +122,6 @@ func (s *SuperghostServer) home(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SuperghostServer) rooms(w http.ResponseWriter, r *http.Request) {
-  fmt.Println("I'm in rooms")
   switch r.Method {
 
     // Send a list of the public games in play
@@ -195,12 +196,6 @@ func (s *SuperghostServer) rooms(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SuperghostServer) room(w http.ResponseWriter, r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  _, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
   switch r.Method {
 
     case http.MethodGet:
@@ -225,12 +220,9 @@ func (s *SuperghostServer) room(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SuperghostServer) join(w http.ResponseWriter, r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
+  ctx := r.Context()
+  roomID := ctx.Value("roomID").(string)
+  roomWrapper := ctx.Value("roomWrapper").(*RoomWrapper)
 
   if _, ok := roomWrapper.Room.GetValidCookie(r.Cookies()); ok {
     // they've already joined -- redirect them back to the room
@@ -268,12 +260,9 @@ func (s *SuperghostServer) join(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SuperghostServer) affix(w http.ResponseWriter, r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
+  ctx := r.Context()
+  roomWrapper := ctx.Value("roomWrapper").(*RoomWrapper)
+
   switch r.Method {
 
     case http.MethodPost:
@@ -294,14 +283,10 @@ func (s *SuperghostServer) affix(w http.ResponseWriter, r *http.Request) {
 
 func (s *SuperghostServer) challengeIsWord(w http.ResponseWriter,
                                              r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
-  switch r.Method {
+  ctx := r.Context()
+  roomWrapper := ctx.Value("roomWrapper").(*RoomWrapper)
 
+  switch r.Method {
     case http.MethodPost:
       err := roomWrapper.Room.ChallengeIsWord(r.Cookies())
       if err != nil {
@@ -317,12 +302,9 @@ func (s *SuperghostServer) challengeIsWord(w http.ResponseWriter,
 
 func (s *SuperghostServer) challengeContinuation(w http.ResponseWriter,
                                                    r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
+  ctx := r.Context()
+  roomWrapper := ctx.Value("roomWrapper").(*RoomWrapper)
+
   switch r.Method {
     case http.MethodPost:
 
@@ -339,12 +321,9 @@ func (s *SuperghostServer) challengeContinuation(w http.ResponseWriter,
 }
 
 func (s *SuperghostServer) rebuttal(w http.ResponseWriter, r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
+  ctx := r.Context()
+  roomWrapper := ctx.Value("roomWrapper").(*RoomWrapper)
+
   switch r.Method {
     case http.MethodPost:
       // it must be your turn to challenge.
@@ -364,12 +343,9 @@ func (s *SuperghostServer) rebuttal(w http.ResponseWriter, r *http.Request) {
 
 func (s *SuperghostServer) currentState(w http.ResponseWriter,
                                           r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
+  ctx := r.Context()
+  roomWrapper := ctx.Value("roomWrapper").(*RoomWrapper)
+
   switch r.Method {
     case http.MethodGet:
       b, err := roomWrapper.Room.MarshalJSONFullLog()
@@ -383,12 +359,9 @@ func (s *SuperghostServer) currentState(w http.ResponseWriter,
 }
 
 func (s *SuperghostServer) nextState(w http.ResponseWriter, r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
+  ctx := r.Context()
+  roomWrapper := ctx.Value("roomWrapper").(*RoomWrapper)
+
   switch r.Method {
 
     case http.MethodGet:
@@ -401,12 +374,9 @@ func (s *SuperghostServer) nextState(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SuperghostServer) concession(w http.ResponseWriter, r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
+  ctx := r.Context()
+  roomWrapper := ctx.Value("roomWrapper").(*RoomWrapper)
+
   switch r.Method {
 
     case http.MethodPost:
@@ -424,12 +394,9 @@ func (s *SuperghostServer) concession(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SuperghostServer) leave(w http.ResponseWriter, r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
+  ctx := r.Context()
+  roomWrapper := ctx.Value("roomWrapper").(*RoomWrapper)
+
   switch r.Method {
 
     case http.MethodPost:
@@ -448,12 +415,9 @@ func (s *SuperghostServer) leave(w http.ResponseWriter, r *http.Request) {
 
 func (s *SuperghostServer) cancellableLeave(w http.ResponseWriter,
                                             r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
+  ctx := r.Context()
+  roomWrapper := ctx.Value("roomWrapper").(*RoomWrapper)
+
   switch r.Method {
 
     case http.MethodPost:
@@ -470,12 +434,9 @@ func (s *SuperghostServer) cancellableLeave(w http.ResponseWriter,
 }
 
 func (s *SuperghostServer) cancelLeave(w http.ResponseWriter, r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
+  ctx := r.Context()
+  roomWrapper := ctx.Value("roomWrapper").(*RoomWrapper)
+
   switch r.Method {
 
     case http.MethodPost:
@@ -493,12 +454,9 @@ func (s *SuperghostServer) cancelLeave(w http.ResponseWriter, r *http.Request) {
 
 
 func (s *SuperghostServer) config(w http.ResponseWriter, r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
+  ctx := r.Context()
+  roomWrapper := ctx.Value("roomWrapper").(*RoomWrapper)
+
   switch r.Method {
 
     case http.MethodGet:
@@ -514,12 +472,9 @@ func (s *SuperghostServer) config(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SuperghostServer) chat(w http.ResponseWriter, r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
+  ctx := r.Context()
+  roomWrapper := ctx.Value("roomWrapper").(*RoomWrapper)
+
   switch r.Method {
 
     case http.MethodGet:
@@ -546,12 +501,9 @@ func (s *SuperghostServer) chat(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SuperghostServer) votekick(w http.ResponseWriter, r *http.Request) {
-  roomID := chi.URLParam(r, "roomID")
-  roomWrapper, ok := s.Rooms[roomID]
-  if !ok {
-    http.NotFound(w, r)
-    return
-  }
+  ctx := r.Context()
+  roomWrapper := ctx.Value("roomWrapper").(*RoomWrapper)
+
   playerID := chi.URLParam(r, "playerID")
   switch r.Method {
 
