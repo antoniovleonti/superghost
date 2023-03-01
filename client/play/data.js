@@ -175,16 +175,3 @@ chatText.addEventListener("keydown", e => {
 		e.preventDefault(); // Prevents the addition of a new line in the text field
 	}
 });
-
-// This will be added to the your personal ready-up button upon creation.
-function readyEventHandler(e) {
-  fetch(window.location.pathname + '/ready-up', { method: 'POST' })
-      .then(response => {
-        if (response.ok) {
-          return response;
-        } else {
-          console.error(response.text());
-        }
-      })
-      .catch(error => console.error(error));
-}
