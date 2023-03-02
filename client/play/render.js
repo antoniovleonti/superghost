@@ -284,16 +284,11 @@ function logMsgToLI(msg) {
           document.createTextNode(" was eliminated from the game!"));
       return txt;
 
-    case "VoteToKick":
-      txt.appendChild(createUsernameSpan(msg.From));
-      txt.appendChild(document.createTextNode(" voted to kick "));
-      txt.appendChild(createUsernameSpan(msg.To));
-      txt.appendChild(document.createTextNode("."));
-      return txt;
-
     case "Kick":
       txt.appendChild(createUsernameSpan(msg.From));
-      txt.appendChild(document.createTextNode(" was kicked from the game."));
+      txt.appendChild(document.createTextNode(" kicked "));
+      txt.appendChild(createUsernameSpan(msg.To));
+      txt.appendChild(document.createTextNode(" from the game."));
       return txt;
 
     case "GameOver":
