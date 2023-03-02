@@ -35,6 +35,10 @@ func (pm *playerManager) currentPlayer() *Player {
   return pm.players[pm.currentPlayerIdx]
 }
 
+func (pm *playerManager) hostPlayer() *Player {
+  return pm.players[0]
+}
+
 func (pm *playerManager) addPlayer(username string, path string,
                                    startingTime time.Duration) (
     *http.Cookie, error) {

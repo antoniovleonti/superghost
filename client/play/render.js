@@ -79,8 +79,10 @@ function populatePlayerList(players,
     if (p.Username == myUsername) {
       const leaveButton = createStandaloneButton("Leave");
       menu.appendChild(leaveButton);
-    } else {
+    } else if (players[0].Username == myUsername) {
       const kickButton = createStandaloneButton("Kick");
+      kickButton.addEventListener(
+          'click', createKickButtonEventListener(p.Username))
       menu.appendChild(kickButton);
     }
     const closeMenu = createStandaloneButton("Close");

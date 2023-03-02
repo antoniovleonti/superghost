@@ -12,7 +12,6 @@ const (
   kAffix logItemType = "Affix"
   kConcede logItemType = "Concede"
   kEliminated logItemType = "Eliminated"
-  kVoteToKick logItemType = "VoteToKick"
   kKick logItemType = "Kick"
   kGameOver logItemType = "GameOver"
   kGameStart logItemType = "GameStart"
@@ -133,18 +132,11 @@ func (bl *BufferedLog) appendElimination(username string) {
                       })
 }
 
-func (bl *BufferedLog) appendVoteToKick(voter string, recipient string) {
-  bl.history = append(bl.history, logItem{
-                        Type: kVoteToKick,
-                        From: voter,
-                        To: recipient,
-                      })
-}
-
-func (bl *BufferedLog) appendKick(username string) {
+func (bl *BufferedLog) appendKick(from, to string) {
   bl.history = append(bl.history, logItem{
                         Type: kKick,
-                        To: username,
+                        From: from,
+                        To: to,
                       })
 }
 

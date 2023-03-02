@@ -1,10 +1,11 @@
 package superghost
 
 import (
-  "testing"
-  "time"
+  "github.com/stretchr/testify/assert"
   "net/http"
   "strconv"
+  "testing"
+  "time"
 )
 
 type testRoomUtils struct {
@@ -48,6 +49,10 @@ func (tru *testRoomUtils) addNPlayers(n int) error {
 
 func (tru *testRoomUtils) currentPlayerCookies() []*http.Cookie {
   return []*http.Cookie{tru.room.pm.currentPlayer().cookie}
+}
+
+func (tru *testRoomUtils) getCookiesFromPlayerIdx(idx int) []*http.Cookie {
+  return []*http.Cookie{tru.room.pm.players[idx].cookie}
 }
 
 func TestGameEndsWhenOnePlayerRemains(t *testing.T) {
@@ -119,50 +124,44 @@ func TestDeadlineWipedAfterRoundEndAndGameEnd(t *testing.T) {
   }
 }
 
-func TestVotekickCurrentPlayer(t *testing.T) {
+func TestHostCanKick(t *testing.T) {
   tru := newDefaultTimedNoEliminationTestRoomUtils()
-  err := tru.addNPlayers(3)
+  err := tru.addNPlayers(2)
   if err != nil {
     t.Errorf("couldn't add players: " + err.Error())
   }
 
-  // Edit the first player's time to make sure when they are kicked their
-  // remaining time does not spill over to the next person (bug as of time of
-  // writing this test). Time starts at 60.
-  tru.room.pm.currentPlayer().timeRemaining = 30 * time.Second
-
-  preKickDeadline := tru.room.pm.currentPlayerDeadline
-
-  err = tru.room.Votekick([]*http.Cookie{tru.usernameToCookie["1"]}, "0")
+  kickRecipientUsername := tru.room.pm.players[1].username
+  err = tru.room.Kick(tru.getCookiesFromPlayerIdx(0), kickRecipientUsername)
   if err != nil {
-    t.Errorf("couldn't vote to kick player 0: " + err.Error())
+    t.Errorf(err.Error())
   }
-  err = tru.room.Votekick([]*http.Cookie{tru.usernameToCookie["2"]}, "0")
+  if len(tru.room.pm.players) != 1 {
+    t.Errorf("expected 1 player after successful kick, got %d",
+             len(tru.room.pm.players))
+  }
+  // Check the log message is correct
+  message := tru.room.log.history[len(tru.room.log.history)-1]
+  assert.Equal(t, kKick, message.Type)
+  assert.Equal(t, tru.room.pm.players[0].username, message.From)
+  assert.Equal(t, kickRecipientUsername, message.To)
+}
+
+func TestOnlyHostCanKick(t *testing.T) {
+  tru := newDefaultTimedNoEliminationTestRoomUtils()
+  err := tru.addNPlayers(2)
   if err != nil {
-    t.Errorf("couldn't vote to kick player 0: " + err.Error())
+    t.Errorf("couldn't add players: " + err.Error())
   }
 
-  // Confirm correct amt of players remains
+  err = tru.room.Kick(tru.getCookiesFromPlayerIdx(1),
+                      tru.room.pm.players[0].username)
+  if err == nil {
+    t.Errorf("expected kick from non-host to fail")
+  }
   if len(tru.room.pm.players) != 2 {
-    t.Errorf("expected 2 players, got %d", len(tru.room.pm.players))
-  }
-  // Make sure the correct player got kicked and the remaining players are in
-  // the right order
-  if tru.room.pm.players[0].username != "1" ||
-     tru.room.pm.players[1].username != "2" {
-    t.Errorf("expected player usernames [\"1\", \"2\"], got [\"%s\", \"%s\"]",
-             tru.room.pm.players[0].username, tru.room.pm.players[1].username)
-  }
-
-  // Expected player to move is "1"
-  if tru.room.pm.currentPlayerIdx != 0 {
-    t.Errorf("expected current player idx to be 0, was %d",
-             tru.room.pm.currentPlayerIdx)
-  }
-
-  // Now make sure the time remaining is not still 30s
-  if tru.room.pm.currentPlayerDeadline != preKickDeadline {
-    t.Errorf("kicked player's remaining time spilled over to next player")
+    t.Errorf("expected 2 players after failed kick, got %d",
+             len(tru.room.pm.players))
   }
 }
 

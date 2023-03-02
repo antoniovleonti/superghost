@@ -398,7 +398,7 @@ func (r *Room) Leave(cookies []*http.Cookie) error {
 
   username, ok := r.pm.getValidCookie(cookies)
   if !ok {
-    return fmt.Errorf("no credentials provided")
+    return fmt.Errorf("could not verify credentials")
   }
 
   if err := r.removePlayer(username); err != nil {
@@ -420,7 +420,7 @@ func (r *Room) Concede(cookies []*http.Cookie) error {
 
   username, ok := r.pm.getValidCookie(cookies)
   if !ok {
-    return fmt.Errorf("no credentials provided")
+    return fmt.Errorf("could not verify credentials")
   }
   switch r.state {
 
@@ -457,37 +457,31 @@ func (r *Room) Concede(cookies []*http.Cookie) error {
   return nil
 }
 
-func (r *Room) Votekick(cookies []*http.Cookie,
-                        kickRecipientUsername string) error {
+func (r *Room) Kick(cookies []*http.Cookie,
+                    kickRecipientUsername string) error {
   r.mutex.Lock()
   defer r.mutex.Unlock()
 
   r.updateLastTouch()
 
-  voterUsername, ok := r.pm.getValidCookie(cookies)
+  kickerUsername, ok := r.pm.getValidCookie(cookies)
   if !ok {
-    return fmt.Errorf("no credentials provided")
+    return fmt.Errorf("could not verify credentials")
+  }
+  if kickerUsername != r.pm.hostPlayer().username {
+    return fmt.Errorf("only the host can kick other players")
   }
 
   kickRecipient, ok := r.pm.usernameToPlayer[kickRecipientUsername]
   if !ok {
-    return fmt.Errorf("player not found");
+    return fmt.Errorf("recipient '%s' not found", kickRecipientUsername);
   }
 
-  err := kickRecipient.votekick(voterUsername)
-  if err != nil {
+  if err := r.removePlayer(kickRecipient.username); err != nil {
     return err
   }
-
   r.log.flush()
-  r.log.appendVoteToKick(voterUsername, kickRecipientUsername)
-  // if a majority has voted to kick the player, remove them from the game
-  if float64(kickRecipient.numVotesToKick) >= float64(len(r.pm.players)) / 1.9 {
-    if err := r.removePlayer(kickRecipientUsername); err != nil {
-      return err
-    }
-    r.log.appendKick(kickRecipientUsername)
-  }
+  r.log.appendKick(kickerUsername, kickRecipient.username)
   return nil
 }
 
@@ -500,7 +494,7 @@ func (r *Room) Chat(cookies []*http.Cookie, content string) (*Message, error) {
 
   username, ok := r.GetValidCookie(cookies)
   if !ok {
-    return nil, fmt.Errorf("no credentials provided")
+    return nil, fmt.Errorf("could not verify credentials")
   }
   if len(content) == 0 {
     return nil, fmt.Errorf("empty message")
@@ -609,7 +603,7 @@ func (r *Room) ScheduleLeave(cookies []*http.Cookie) error {
 
   username, ok := r.pm.getValidCookie(cookies)
   if !ok {
-    return fmt.Errorf("no credentials provided")
+    return fmt.Errorf("could not verify credentials")
   }
 
   // If they are already scheduled to leave, use the previously scheduled time
@@ -659,7 +653,7 @@ func (r *Room) CancelLeaveIfScheduled(cookies []*http.Cookie) error {
 
   username, ok := r.pm.getValidCookie(cookies)
   if !ok {
-    return fmt.Errorf("no credentials provided")
+    return fmt.Errorf("could not verify credentials")
   }
 
   ch, ok := r.usernameToCancelLeaveCh[username]

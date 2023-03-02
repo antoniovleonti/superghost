@@ -148,6 +148,22 @@ concedeButton.addEventListener('click', e => {
       .catch(error => console.error(error));
 });
 
+function createKickButtonEventListener(username) {
+  return function(e) {
+    const data = new URLSearchParams({Username: username});
+    fetch(window.location.pathname + '/kick',
+          { method: 'POST', body: data })
+        .then(response => {
+          if (response.ok) {
+            return response;
+          } else {
+            console.error(response.text());
+          }
+        })
+        .catch(error => console.error(error));
+  };
+}
+
 chatForm.addEventListener('submit', e => {
   e.preventDefault();
   const data = new URLSearchParams(new FormData(chatForm));

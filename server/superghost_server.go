@@ -48,7 +48,7 @@ func NewSuperghostServer(rooms map[string]*RoomWrapper) *SuperghostServer {
       r.Post("/challenge-continuation", server.challengeContinuation)
       r.Post("/rebuttal", server.rebuttal)
       r.Post("/concession", server.concession)
-      r.Post("/players/{playerID}/votekick", server.votekick)
+      r.Post("/kick", server.kick)
       r.Get("/config", server.config)
       r.Post("/chat", server.chat)
       r.Get("/next-chat", server.chat)
@@ -500,15 +500,21 @@ func (s *SuperghostServer) chat(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-func (s *SuperghostServer) votekick(w http.ResponseWriter, r *http.Request) {
+func (s *SuperghostServer) kick(w http.ResponseWriter, r *http.Request) {
   ctx := r.Context()
   roomWrapper := ctx.Value("roomWrapper").(*RoomWrapper)
 
-  playerID := chi.URLParam(r, "playerID")
+  err := r.ParseForm()
+  if err != nil {
+    http.Error(w, err.Error(), http.StatusBadRequest)
+    return
+  }
+  recipient := r.FormValue("Username")
+
   switch r.Method {
 
     case http.MethodPost:
-      err := roomWrapper.Room.Votekick(r.Cookies(), playerID)
+      err := roomWrapper.Room.Kick(r.Cookies(), recipient)
       if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
