@@ -55,9 +55,6 @@ func (tru *testRoomUtils) getCookiesFromPlayerIdx(idx int) []*http.Cookie {
   return []*http.Cookie{tru.room.pm.players[idx].cookie}
 }
 
-func TestGameEndsWhenOnePlayerRemains(t *testing.T) {
-}
-
 func TestNoDeadlineAtRoundStart(t *testing.T) {
   tru := newDefaultTimedNoEliminationTestRoomUtils()
   err := tru.addNPlayers(2)
@@ -172,103 +169,67 @@ func TestAffix(t *testing.T) {
     t.Errorf("couldn't add two players: " + err.Error())
   }
 
-  // Try to affix two letters at once
-  err = tru.room.AffixLetter(tru.currentPlayerCookies(), "a", "b")
-  if err == nil {
-    t.Errorf("added both a prefix and suffix")
+  badCases := [][]string{
+    {"a", "b"},
+    {"ab", ""},
+    {"", "ab"},
+    {"", ""},
   }
-
-  // Try to affix two letters at once
-  err = tru.room.AffixLetter(tru.currentPlayerCookies(), "ab", "")
-  if err == nil {
-    t.Errorf("added a prefix or len 2")
-  }
-
-  err = tru.room.AffixLetter(tru.currentPlayerCookies(), "", "ab")
-  if err == nil {
-    t.Errorf("added a suffix or len 2")
+  for _, pair := range badCases {
+    assert.Error(t, tru.room.AffixLetter(tru.currentPlayerCookies(),
+                                         pair[0], pair[1]))
+    assert.Zero(t, tru.room.turnID)  // Should not increment on err
   }
 
   preAffixPlayer := tru.room.pm.currentPlayerUsername()
-  err = tru.room.AffixLetter(tru.currentPlayerCookies(), "a", "")
-  if err != nil {
-    t.Errorf("couldn't add valid prefix: " + err.Error())
-  }
-  // make sure current player changes after affixing
-  if preAffixPlayer == tru.room.pm.currentPlayerUsername() {
-    t.Errorf("current player did not increment after affixing letter")
-  }
 
-  err = tru.room.AffixLetter(tru.currentPlayerCookies(), "", "b")
-  if err != nil {
-    t.Errorf("couldn't add valid suffix")
-  }
-
-  if tru.room.stem != "AB" {
-    t.Errorf("expected stem to equal \"ab\", got \"%s\"", tru.room.stem)
-  }
+  // valid affix
+  assert.NoError(t, tru.room.AffixLetter(tru.currentPlayerCookies(), "a", ""))
+  assert.NotEqual(t, preAffixPlayer, tru.room.pm.currentPlayerUsername())
+  assert.Equal(t, 1, tru.room.turnID)
+  // valid affix
+  assert.NoError(t, tru.room.AffixLetter(tru.currentPlayerCookies(), "", "b"))
+  assert.Equal(t, 2, tru.room.turnID)
+  // check final result
+  assert.Equal(t, "AB", tru.room.stem)
 }
 
 func TestCancellableLeave(t *testing.T) {
   tru := newDefaultTimedNoEliminationTestRoomUtils()
-  err := tru.addNPlayers(3)
-  if err != nil {
-    t.Errorf("couldn't add two players: " + err.Error())
-  }
+  assert.NoError(t, tru.addNPlayers(2))
 
-  username := "0"
-  player, ok := tru.room.pm.usernameToPlayer[username]
-  if !ok {
-    t.Errorf("couldn't find player 0")
-  }
-  cookies := []*http.Cookie{player.cookie}
+  username := tru.room.pm.players[0].username
+  cookies := tru.getCookiesFromPlayerIdx(0)
 
   // Leave then cancel, then make sure it actually got cancelled
   tru.room.ScheduleLeave(cookies)
   // make sure leave is scheduled
-  if _, ok := tru.room.usernameToCancelLeaveCh[username]; !ok {
-    t.Errorf("cancel leave channel does not exist")
-  }
+  assert.Contains(t, tru.room.usernameToCancelLeaveCh, username)
+
   tru.room.CancelLeaveIfScheduled(cookies)
-  time.Sleep(10 * time.Millisecond)
-  if _, ok := tru.room.usernameToCancelLeaveCh[username]; ok {
-    t.Errorf("cancel leave channel was not deleted after cancel")
-  }
-  // Wait and see if player leaves
-  deadline := time.NewTimer(1 * time.Second)
-  select {
-    case <-deadline.C:
-      // Just escape the select statement. Success.
-    case <-tru.asyncUpdateCh:
-      t.Errorf("player left even though CancelLeaveIfScheduled was called")
-  }
+  time.Sleep(1 * time.Millisecond)
+
+  // If the player is still there and the channel was deleted, I see no way
+  // the player could still end up leaving.
+  assert.NotContains(t, tru.room.usernameToCancelLeaveCh, username)
+  assert.Equal(t, 2, len(tru.room.pm.players))
 
   // Leave and don't cancel, then make sure the player eventually leaves
   tru.room.ScheduleLeave(cookies)
   // make sure a channel exists to cancel
-  if _, ok := tru.room.usernameToCancelLeaveCh[username]; !ok {
-    t.Errorf("cancel leave channel does not exist (2)")
-  }
+  assert.Contains(t, tru.room.usernameToCancelLeaveCh, username)
   // Wait and see if player leaves
-  deadline = time.NewTimer(10 * time.Second)
+  deadline := time.NewTimer(1 * time.Second)
   select {
     case <-deadline.C:
       t.Errorf("scheduled leave did not take effect (or async update channel " +
                "was not notified if it did)")
     case <-tru.asyncUpdateCh:
-      // Verify player count is correct
-      if len(tru.room.pm.players) != 2 {
-        t.Errorf("got async update but player count is %d (expected 2)",
-                 len(tru.room.pm.players))
-      }
-      if _, ok := tru.room.pm.usernameToPlayer[username]; ok {
-        t.Errorf("got async update, but player 0 is still in the game")
-      }
   }
-
-  if _, ok := tru.room.usernameToCancelLeaveCh[username]; ok {
-    t.Errorf("cancel leave channel was not deleted after player left")
-  }
+  // Verify player count is correct
+  assert.Equal(t, 1, len(tru.room.pm.players))
+  assert.NotContains(t, tru.room.pm.usernameToPlayer, username)
+  assert.NotContains(t, tru.room.usernameToCancelLeaveCh, username)
 }
 
 func TestCancellableLeaveToOnePlayerEndsGame(t *testing.T) {
@@ -368,4 +329,14 @@ func TestPlayerTimeRemainingAfterFirstMove(t *testing.T) {
   if tru.room.pm.players[0].timeRemaining < 0 {
     t.Errorf("time remaining is less than zero!")
   }
+}
+
+func TestTurnIDIsZeroAtStart(t *testing.T) {
+  tru := newDefaultTimedNoEliminationTestRoomUtils()
+  err := tru.addNPlayers(2)
+  if err != nil {
+    t.Errorf("couldn't add two players: " + err.Error())
+  }
+
+  assert.Equal(t, 0, tru.room.turnID)
 }

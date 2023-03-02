@@ -60,6 +60,8 @@ type Room struct {
   asyncUpdateCh chan<- struct{}
   usernameToCancelLeaveCh map[string]chan struct{}
 
+  turnID int;
+
   lastTouch time.Time
 }
 
@@ -135,6 +137,7 @@ func NewRoom(config Config, asyncUpdateCh chan<- struct{}) *Room {
   r.endTurnCh = nil
   r.usernameToCancelLeaveCh = make(map[string]chan struct{})
 
+  r.turnID = 0
   r.pm = newPlayerManager()
   r.waitToStart()
   r.usedWords = make(map[string]bool)
@@ -507,9 +510,9 @@ func (r *Room) Chat(cookies []*http.Cookie, content string) (*Message, error) {
 }
 
 func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
-  // Outside the go func() {} section, this is a synchronous function that runs
-  // only when called by another mutex-protected function (therefor DO NOT grab
-  // the mutex outside the go func() part!)
+  // Outside the `go` section, this is a synchronous function that runs only
+  // when called by another mutex-protected function (therefor DO NOT grab the
+  // mutex outside the go func() part!)
   if r.config.PlayerTimePerWord == 0 * time.Second {
     return
   }
@@ -527,8 +530,7 @@ func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
         r.mutex.Lock()
         defer r.mutex.Unlock()
 
-        r.updateLastTouch()
-
+        // TODO: replace with turn ID
         if expectedPlayerUsername != r.pm.currentPlayerUsername() {
           // The player sent their response at the moment they ran out of time
           // but before we got the mutex lock. For now I'll just give it to
@@ -540,12 +542,10 @@ func (r *Room) startTurnAndCountdown(expectedPlayerUsername string) {
           return
         }
 
-        isEliminated := r.pm.currentPlayer().incrementScore(
-            r.config.EliminationThreshold)
-
         r.log.flush()
         r.log.appendTimeout(r.pm.currentPlayerUsername())
-        if isEliminated {
+
+        if r.pm.currentPlayer().incrementScore(r.config.EliminationThreshold) {
           r.log.appendElimination(r.pm.currentPlayerUsername())
         }
 
@@ -571,6 +571,7 @@ func (r *Room) endTurn() {
     }
     r.pm.endTurn()
   }
+  r.turnID++
 }
 
 func (r *Room) removePlayer(username string) error {

@@ -121,6 +121,24 @@ challengeContButton.addEventListener('click', e => {
       .catch(error => console.error(error));
 });
 
+function leaveButtonHandler(e) {
+  fetch(window.location.pathname + '/leave',
+        { method: 'POST', redirect: 'follow' })
+      .then(response => {
+        if (response.redirected) {
+          window.location.href = response.url;
+        }
+        if (!response.ok) {
+          response.text().then(txt => {
+            console.error(`${response.status} ${txt}`);
+          });
+        }
+      })
+      .catch(err => {
+        console.error(err);
+      });
+}
+
 challengeIsWordButton.addEventListener('click', e => {
   fetch(window.location.pathname + '/challenge-is-word',
         { method: 'POST' })

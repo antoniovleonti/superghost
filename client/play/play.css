@@ -5,11 +5,18 @@
                                            var(--affix-color) 100%);
   --rebut-gradient-player: linear-gradient(135deg, var(--foreground-color) 0%,
                                            var(--rebut-color) 100%);
+  --border-color: black;
+  --background-color: white;
+  --midground-color: #e8e8e8;
+  --foreground-color: white;
+  --text-color: black;
+/*
   --border-color: darkgrey;
   --background-color: lightgrey;
   --midground-color: #e8e8e8;
   --foreground-color: white;
   --text-color: black;
+  */
 }
 
 body {
@@ -57,11 +64,8 @@ h1 {
   margin-bottom: 0;
   border-radius: 1vmin;
   overflow: hidden; /* Prevents content from squaring corners */
-  border: none;
+  border: 1px solid black;
 }
-.section {
-}
-
 #chat .section-content, #game-log .section-content {
   height: 10em;
   flex: 1 0 auto;
@@ -98,6 +102,7 @@ ol {
 }
 
 li {
+  box-sizing: border-box;
   background: var(--foreground-color);
   border-top: 1px solid var(--border-color);
   padding: 0.25em;
@@ -106,6 +111,9 @@ li {
 }
 li:first-of-type {
   border-top: none;
+}
+li:last-of-type {
+  border-bottom: 1px solid black;
 }
 
 button, input[type=button], input[type=submit], input[type=reset] {
@@ -141,6 +149,7 @@ button:active, input[type=button]:active,
   padding-top: 2em;
   padding-bottom: 2em;
   line-height: 1.5;
+  border: none;
 }
 #main-panel .standalone-button {
   margin-left: auto;
@@ -330,7 +339,6 @@ span.error {
     grid-row: 1 / -1;
     height: 100%;
     width: 100%;
-    border: none;
     line-height: 4vh;
     background-color: var(--foreground-color);
     box-sizing: border-box;
