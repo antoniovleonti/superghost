@@ -15,18 +15,13 @@
     </a>
   </div>
 
-  <div id=config>
-    <button id=show-config-button>
-      Show room info
-    </button>
-    <dialog id=config-dialog>
-      <h3>Room info</h3>
-      <div id=config-span></div>
-      <form method=dialog>
-        <button id=hide-config-button class=standalone-button>Hide</button>
-      </form>
-    </dialog>
-  </div>
+  <dialog id=config-dialog>
+    <h3>Room info</h3>
+    <div id=config-span></div>
+    <form method=dialog>
+      <button id=hide-config-button class=standalone-button>Hide</button>
+    </form>
+  </dialog>
 
   <dialog id=join-dialog>
     <h3>Join</h3>
@@ -49,6 +44,10 @@
      class='section content-container'
      data-state='waiting for players'
      data-is-my-turn=false>
+
+      <button id=show-config-button class=standalone-button>
+        Show room info
+      </button>
 
       <span id=short-status>
         This is a placeholder status (why hasn't this been updated yet?)
