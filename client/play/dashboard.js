@@ -1,7 +1,7 @@
 "use strict";
 
-class MainPanelManager {
-  mainPanel_;
+class DashboardManager {
+  dashboard_;
   affixForm_;
   rebutForm_;
   onlyEnabledOnMyTurn_;
@@ -10,7 +10,7 @@ class MainPanelManager {
 
   // Use an opts struct to make this less error-prone
   constructor(opts) {
-    this.mainPanel_ = opts.mainPanel;
+    this.dashboard_ = opts.dashboard;
     this.affixForm_ = opts.affixForm;
     this.rebutForm_ = opts.rebutForm;
     this.challengeContinuationButton_ = opts.challengeContinuationButton;
@@ -40,9 +40,9 @@ class MainPanelManager {
   updateShortStatus(nextPlayer, lastPlayer, state, myUsername) {
     Client.clearElement(this.shortStatusSpan_);
 
-    const nextOrYour = MainPanelManager.createPlayersOrYourSpan(
+    const nextOrYour = DashboardManager.createPlayersOrYourSpan(
         nextPlayer, nextPlayer == myUsername);
-    const lastOrYour = MainPanelManager.createPlayersOrYourSpan(
+    const lastOrYour = DashboardManager.createPlayersOrYourSpan(
         lastPlayer, lastPlayer == myUsername);
 
     switch (state) {
@@ -73,11 +73,11 @@ class MainPanelManager {
   updateButtons(state, currentPlayerUsername, myUsername) {
     // Hide one, show the other
     const isMyTurn = (currentPlayerUsername == myUsername);
-    this.mainPanel_.dataset.isMyTurn = isMyTurn;
+    this.dashboard_.dataset.isMyTurn = isMyTurn;
     for (const el of this.onlyEnabledOnMyTurn_) {
       el.disabled = !isMyTurn
     }
-    this.mainPanel_.dataset.state = state;
+    this.dashboard_.dataset.state = state;
   }
 
   updateActiveStemSpans(stem) {

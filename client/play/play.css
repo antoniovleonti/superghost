@@ -145,22 +145,22 @@ button:active, input[type=button]:active,
   transition: 0.1s;
 }
 
-#main-panel {
+#dashboard {
   text-align: center;
   padding-bottom: 2em;
   line-height: 1.5;
   border: none;
 }
-#main-panel .standalone-button {
+#dashboard .standalone-button {
   margin-left: auto;
   margin-right: auto;
 }
 /* Hide sections, buttons, etc. when it's not useful to show them */
-#main-panel:not([data-state="waiting to start"])[data-is-my-turn=true]
+#dashboard:not([data-state="waiting to start"])[data-is-my-turn=true]
     #spectator-view,
-#main-panel[data-state="waiting to start"] .only-enabled-during-play,
-#main-panel:not([data-state=rebut][data-is-my-turn=true]) #rebut-form,
-#main-panel:not([data-state=edit][data-is-my-turn=true]) #affix-form {
+#dashboard[data-state="waiting to start"] .only-enabled-during-play,
+#dashboard:not([data-state=rebut][data-is-my-turn=true]) #rebut-form,
+#dashboard:not([data-state=edit][data-is-my-turn=true]) #affix-form {
   display: none;
   transition: 0.5s;
 }
@@ -191,7 +191,7 @@ button:active, input[type=button]:active,
 .players-list-item[data-active-player=rebut] .show-player-options {
   background: var(--rebut-gradient-player);
 }
-#players, #main-panel {
+#players, #dashboard {
   flex-shrink: 0;
 }
 
@@ -332,7 +332,7 @@ span.error {
   #grid-wrapper > * {
     background-color: var(--foreground-color);
   }
-  #main-panel {
+  #dashboard {
     grid-column: 2;
     grid-row: 1 / -1;
     height: 100%;

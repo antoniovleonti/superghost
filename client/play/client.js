@@ -5,7 +5,7 @@ class Client {
   gameLogManager_;
   chatManager_;
   configManager_;
-  mainPanelManager_;
+  dashboardManager_;
   joinManager_;
 
   myUsername_;
@@ -24,8 +24,8 @@ class Client {
         document.getElementById("config-span"),
         document.getElementById("show-config-button"),
         document.getElementById("config-dialog"));
-    this.mainPanelManager_ = new MainPanelManager({
-      mainPanel: document.getElementById("main-panel"),
+    this.dashboardManager_ = new DashboardManager({
+      dashboard: document.getElementById("dashboard"),
       affixForm: document.getElementById("affix-form"),
       rebutForm: document.getElementById("rebut-form"),
       concedeButton: document.getElementById("concede-button"),
@@ -45,7 +45,7 @@ class Client {
 
   renderGameState(room) {
     const deadline = Date.parse(room.CurrentPlayerDeadline)
-    this.mainPanelManager_.update(room, this.myUsername_);
+    this.dashboardManager_.update(room, this.myUsername_);
     this.playersManager_.update(
         room.Players, room.State, room.CurrentPlayerUsername, deadline,
         this.myUsername_, this.configManager_.config().MaxPlayers);
@@ -78,6 +78,7 @@ class Client {
     // doesn't recognize the player
     const cancelLeaveResponse = await Client.cancelLeave();
     const hasJoined = cancelLeaveResponse.ok;
+    console.log({hasJoined});
     this.myUsername_ = hasJoined ? Client.getUsernameFromCookie() : null;
 
     // Sync with the server
@@ -160,6 +161,7 @@ class Client {
     const usernameToID = cookieKVPairs[cookieKVPairs.length - 1].split("=");
     const username = usernameToID[0].trim();
     console.log({ rawCookie: document.cookie, derivedUsername: username });
+    return username;
   }
 }
 
