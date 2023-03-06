@@ -1,3 +1,5 @@
+"use strict";
+
 class GameLogManager extends ListManager {
   push(msgs) {
     let isScrolledToBottom = this.checkScrolledToBottom(this.logOL_);

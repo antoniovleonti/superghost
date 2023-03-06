@@ -1,3 +1,5 @@
+"use strict";
+
 class ChatManager extends ListManager {
   constructor(ol, form, textarea) {
     super(ol);
